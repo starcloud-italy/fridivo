@@ -1,6 +1,6 @@
-# Fridivo backend — Modulo 1
+# Fridivo backend — Moduli 1–2
 
-Backend FastAPI modulare per autenticazione e household.
+Backend FastAPI modulare per autenticazione, household e catalogo prodotti locale.
 
 ## Avvio locale
 
@@ -36,3 +36,12 @@ alembic upgrade head
 
 La revisione iniziale gestisce soltanto `users`, `households` e `household_members`. `alembic/env.py` esclude `products` e tutte le tabelle esterne riflesse dalle operazioni autogenerate.
 
+## Catalogo prodotti
+
+Gli endpoint, protetti da JWT Bearer, interrogano esclusivamente la tabella PostgreSQL locale:
+
+- `GET /api/v1/products/barcode/{barcode}` — lookup GTIN/EAN/UPC esatto;
+- `GET /api/v1/products/search?q=...&limit=20&offset=0` — ricerca testuale per nome;
+- `GET /api/v1/products/{barcode}` — dettaglio prodotto.
+
+Il catalogo è read-only per l'applicazione. L'adapter riconosce sia i nomi di colonna Open Food Facts (`code`, `product_name`) sia le varianti normalizzate (`barcode`, `name`).
