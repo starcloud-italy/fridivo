@@ -1,0 +1,61 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: fridivo
+      POSTGRES_USER: fridivo
+      POSTGRES_PASSWORD: local-development-only
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fridivo -d fridivo"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  api:
+    build: .
+    environment:
+      DATABASE_URL: postgresql+psycopg://fridivo:local-development-only@db:5432/fridivo
+      JWT_SECRET_KEY: local-development-secret-change-before-deploying
+      JWT_ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
+
+  db_test:
+    image: postgres:16-alpine
+    profiles: ["test"]
+    environment:
+      POSTGRES_DB: fridivo_test
+      POSTGRES_USER: fridivo_test
+      POSTGRES_PASSWORD: test-only
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fridivo_test -d fridivo_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+    tmpfs:
+      - /var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+
+  test:
+    build: .
+    profiles: ["test"]
+    environment:
+      TEST_DATABASE_URL: postgresql+psycopg://fridivo_test:test-only@db_test:5432/fridivo_test
+      JWT_SECRET_KEY: test-secret-not-for-production
+      JWT_ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+    depends_on:
+      db_test:
+        condition: service_healthy
+    command: pytest -v
+
+volumes:
+  postgres_data:
