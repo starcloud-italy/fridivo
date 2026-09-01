@@ -1,4 +1,4 @@
-# Fridivo backend — Moduli 1–2
+# Fridivo backend — Moduli 1–3
 
 Backend FastAPI modulare per autenticazione, household e catalogo prodotti locale.
 
@@ -45,3 +45,14 @@ Gli endpoint, protetti da JWT Bearer, interrogano esclusivamente la tabella Post
 - `GET /api/v1/products/{barcode}` — dettaglio prodotto.
 
 Il catalogo è read-only per l'applicazione. L'adapter riconosce sia i nomi di colonna Open Food Facts (`code`, `product_name`) sia le varianti normalizzate (`barcode`, `name`).
+
+## Household inventory
+
+Gli endpoint inventory sono protetti da JWT e operano sempre sull'household dell'utente:
+
+- `POST /api/v1/inventory`;
+- `GET /api/v1/inventory`;
+- `PATCH /api/v1/inventory/{id}`;
+- `DELETE /api/v1/inventory/{id}`.
+
+Ogni prodotto può comparire una sola volta per household. Il catalogo viene consultato in sola lettura per validare il barcode e arricchire le risposte con nome, brand, formato e immagine.

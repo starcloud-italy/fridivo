@@ -33,6 +33,9 @@ class Household(Base):
     memberships = relationship(
         "HouseholdMember", back_populates="household", cascade="all, delete-orphan"
     )
+    inventory_items = relationship(
+        "InventoryItem", back_populates="household", cascade="all, delete-orphan"
+    )
 
 
 class HouseholdMember(Base):

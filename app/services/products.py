@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from functools import lru_cache
 
-from sqlalchemy import inspect, text
+from sqlalchemy import bindparam, inspect, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
@@ -114,6 +114,20 @@ def get_product_by_barcode(db: Session, barcode: str) -> CatalogProduct | None:
     return _to_product(row) if row is not None else None
 
 
+def get_products_by_barcodes(
+    db: Session, barcodes: list[str]
+) -> dict[str, CatalogProduct]:
+    if not barcodes:
+        return {}
+    columns = _columns_for(db)
+    projection, barcode_column, _ = _quoted_projection(db, columns)
+    statement = text(
+        f"SELECT {projection} FROM products WHERE {barcode_column} IN :barcodes"
+    ).bindparams(bindparam("barcodes", expanding=True))
+    products = (_to_product(row) for row in db.execute(statement, {"barcodes": barcodes}))
+    return {product.barcode: product for product in products}
+
+
 def search_products(
     db: Session, query: str, *, limit: int, offset: int
 ) -> list[CatalogProduct]:
@@ -131,4 +145,3 @@ def search_products(
         {"pattern": f"%{escaped_query}%", "limit": limit, "offset": offset},
     )
     return [_to_product(row) for row in rows]
-
