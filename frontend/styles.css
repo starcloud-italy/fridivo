@@ -207,7 +207,18 @@ body.sheet-open { overflow: hidden; }
 .summary-controls { display: grid; grid-template-columns: 38px 38px 38px; align-items: center; }
 .summary-controls button { min-height: 40px; border: 0; border-radius: 10px; background: #edf3ec; color: var(--green); font-size: 20px; }
 .summary-controls output { text-align: center; font-weight: 850; }
-.remove-summary-item { grid-column: 3; justify-self: end; min-height: 34px; margin-top: -3px; border: 0; background: transparent; color: var(--danger); font-size: 12px; font-weight: 700; }
+.remove-summary-item { min-height: 30px; margin-top: 2px; border: 0; padding: 0; background: transparent; color: var(--danger); font-size: 12px; font-weight: 700; }
+.summary-item.location-missing { border-color: rgba(242,166,90,.7); }
+.summary-location-field { grid-column: 1 / -1; min-width: 0; margin: 2px 0 0; padding: 9px; border: 1.5px solid var(--border); border-radius: 13px; }
+.summary-location-field legend { padding: 0 5px; color: var(--ink); font-size: 12px; font-weight: 800; }
+.summary-location-field legend span { margin-left: 5px; color: var(--green); font-size: 11px; font-weight: 700; }
+.summary-location-field.needs-selection { border-color: var(--accent); background: #fffaf3; }
+.summary-location-field.needs-selection legend span { color: #92581d; }
+.summary-location-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 6px; }
+.summary-location-button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-width: 0; min-height: 52px; border: 1.5px solid var(--border); border-radius: 10px; padding: 5px 2px; background: white; color: var(--muted); font-size: 10px; font-weight: 750; }
+.summary-location-button svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.summary-location-button.selected { border-color: var(--green); background: #e7f0e5; color: var(--green-dark); box-shadow: 0 0 0 2px rgba(63,107,87,.1); }
+.summary-location-button:focus-visible { outline: 3px solid rgba(121,168,107,.3); outline-offset: 1px; }
 .summary-options { margin-top: 18px; border-radius: 18px; padding: 15px; background: white; }
 .summary-options .field { margin-bottom: 0; }
 .summary-actions { position: sticky; bottom: calc(-20px - env(safe-area-inset-bottom)); display: grid; grid-template-columns: .8fr 1.2fr; gap: 9px; margin: 14px -16px -20px; padding: 12px 16px calc(20px + env(safe-area-inset-bottom)); border-top: 1px solid var(--border); background: rgba(250,248,242,.96); backdrop-filter: blur(12px); }

@@ -1,4 +1,9 @@
-import { BarcodePresenceTracker, addSessionUnit } from "./scanner-state.mjs";
+import {
+  BarcodePresenceTracker,
+  addSessionUnit,
+  sessionIsReadyToSave,
+  setSessionItemLocation
+} from "./scanner-state.mjs";
 
 const config = window.__FRIDIVO_CONFIG__ || {};
 const API_BASE_URL = String(config.apiBaseUrl || "").replace(/\/$/, "");
@@ -129,6 +134,12 @@ function productImage(product) {
 }
 
 const locations = { fridge: "Frigorifero", freezer: "Congelatore", pantry: "Dispensa", other: "Altro" };
+const summaryStorageLocations = [
+  { value: "fridge", label: "Frigo", icon: '<svg viewBox="0 0 24 24"><rect x="6" y="3" width="12" height="18" rx="2"/><path d="M6 10h12M9 6v2M9 13v3"/></svg>' },
+  { value: "freezer", label: "Freezer", icon: '<svg viewBox="0 0 24 24"><path d="M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9M9 5l3 2 3-2M9 19l3-2 3 2"/></svg>' },
+  { value: "pantry", label: "Dispensa", icon: '<svg viewBox="0 0 24 24"><path d="M4 6h16v14H4zM4 11h16M8 8h3M8 14h3"/></svg>' },
+  { value: "other", label: "Altro", icon: '<svg viewBox="0 0 24 24"><path d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1 1 14 0Z"/><circle cx="12" cy="10" r="2"/></svg>' }
+];
 
 function expiryMeta(dateValue) {
   if (!dateValue) return "";
@@ -536,7 +547,6 @@ function openScanner() {
   pendingScanUnits.clear();
   unknownScans.length = 0;
   elements.scanExpiryDate.value = "";
-  $("input[name='scan-location'][value='fridge']").checked = true;
   setMessage(elements.scannerSaveError);
   renderScanSession();
   elements.scannerLive.hidden = false;
@@ -559,22 +569,41 @@ function closeScanner() {
   lastFocusedElement?.focus();
 }
 
+function renderSummaryLocationButtons(selectedLocation) {
+  return summaryStorageLocations.map(({ value, label, icon }) => `
+    <button class="summary-location-button${selectedLocation === value ? " selected" : ""}" type="button"
+      data-summary-location="${value}" aria-pressed="${selectedLocation === value}" aria-label="${label}">
+      ${icon}<span>${label}</span>
+    </button>`).join("");
+}
+
+function updateSummaryConfirmationState() {
+  elements.confirmScanned.disabled = !sessionIsReadyToSave(scanSession);
+}
+
 function renderScannerSummary() {
   const items = [...scanSession.values()];
   elements.summaryEmpty.hidden = items.length !== 0;
   elements.summaryOptions.hidden = items.length === 0;
-  elements.confirmScanned.disabled = items.length === 0;
-  elements.summaryList.innerHTML = items.map(({ product, quantity: itemQuantity }) => `
-    <article class="summary-item" data-barcode="${escapeHtml(product.barcode)}">
+  elements.summaryList.innerHTML = items.map(({ product, quantity: itemQuantity, storageLocation }) => `
+    <article class="summary-item${storageLocation ? "" : " location-missing"}" data-barcode="${escapeHtml(product.barcode)}">
       ${productImage(product)}
-      <div><h3 class="product-name">${escapeHtml(product.name || "Prodotto")}</h3>${product.brands ? `<p class="product-brand">${escapeHtml(product.brands)}</p>` : ""}</div>
+      <div>
+        <h3 class="product-name">${escapeHtml(product.name || "Prodotto")}</h3>
+        ${product.brands ? `<p class="product-brand">${escapeHtml(product.brands)}</p>` : ""}
+        <button class="remove-summary-item" type="button" data-summary-action="remove">Rimuovi</button>
+      </div>
       <div class="summary-controls" aria-label="Quantità di ${escapeHtml(product.name || "prodotto")}">
         <button type="button" data-summary-action="decrease" aria-label="Diminuisci quantità">−</button>
         <output aria-live="polite">${itemQuantity}</output>
         <button type="button" data-summary-action="increase" aria-label="Aumenta quantità">+</button>
       </div>
-      <button class="remove-summary-item" type="button" data-summary-action="remove">Rimuovi</button>
+      <fieldset class="summary-location-field${storageLocation ? "" : " needs-selection"}" aria-invalid="${!storageLocation}">
+        <legend>Destinazione <span>${storageLocation ? escapeHtml(locations[storageLocation]) : "Scegli una posizione"}</span></legend>
+        <div class="summary-location-grid">${renderSummaryLocationButtons(storageLocation)}</div>
+      </fieldset>
     </article>`).join("");
+  updateSummaryConfirmationState();
 }
 
 function finishScanning() {
@@ -600,8 +629,9 @@ async function updateExistingInventoryItem(existing, scannedItem, storageLocatio
   return api(`/api/v1/inventory/${existing.id}`, { method: "PATCH", body: JSON.stringify(payload) });
 }
 
-async function saveScannedItem(scannedItem, inventoryByBarcode, storageLocation, expiryDate) {
+async function saveScannedItem(scannedItem, inventoryByBarcode, expiryDate) {
   const barcode = scannedItem.product.barcode;
+  const storageLocation = scannedItem.storageLocation;
   const existing = inventoryByBarcode.get(barcode);
   if (existing) return updateExistingInventoryItem(existing, scannedItem, storageLocation, expiryDate);
   try {
@@ -667,11 +697,29 @@ $("#scanner-manual-search").addEventListener("click", () => {
 });
 
 elements.summaryList.addEventListener("click", (event) => {
-  const actionButton = event.target.closest("[data-summary-action]");
-  const row = actionButton?.closest("[data-barcode]");
-  if (!actionButton || !row) return;
+  const row = event.target.closest("[data-barcode]");
+  if (!row) return;
   const item = scanSession.get(row.dataset.barcode);
   if (!item) return;
+  const locationButton = event.target.closest("[data-summary-location]");
+  if (locationButton) {
+    if (!setSessionItemLocation(scanSession, row.dataset.barcode, locationButton.dataset.summaryLocation)) return;
+    row.classList.remove("location-missing");
+    const locationField = row.querySelector(".summary-location-field");
+    locationField.classList.remove("needs-selection");
+    locationField.setAttribute("aria-invalid", "false");
+    locationField.querySelector("legend span").textContent = locations[item.storageLocation];
+    row.querySelectorAll("[data-summary-location]").forEach((button) => {
+      const selected = button.dataset.summaryLocation === item.storageLocation;
+      button.classList.toggle("selected", selected);
+      button.setAttribute("aria-pressed", String(selected));
+    });
+    setMessage(elements.scannerSaveError);
+    updateSummaryConfirmationState();
+    return;
+  }
+  const actionButton = event.target.closest("[data-summary-action]");
+  if (!actionButton) return;
   const action = actionButton.dataset.summaryAction;
   if (action === "remove") scanSession.delete(row.dataset.barcode);
   if (action === "increase") item.quantity += 1;
@@ -682,9 +730,17 @@ elements.summaryList.addEventListener("click", (event) => {
 elements.confirmScanned.addEventListener("click", async () => {
   const items = [...scanSession.entries()];
   if (!items.length) return;
+  if (!sessionIsReadyToSave(scanSession)) {
+    elements.summaryList.querySelectorAll(".summary-item").forEach((row) => {
+      const item = scanSession.get(row.dataset.barcode);
+      row.classList.toggle("location-missing", !item?.storageLocation);
+      row.querySelector(".summary-location-field").classList.toggle("needs-selection", !item?.storageLocation);
+    });
+    setMessage(elements.scannerSaveError, "Scegli una destinazione per ogni prodotto.");
+    return;
+  }
   setMessage(elements.scannerSaveError);
   setLoading(elements.confirmScanned, true);
-  const storageLocation = $("input[name='scan-location']:checked").value;
   const expiryDate = elements.scanExpiryDate.value || null;
   const failures = [];
   try {
@@ -692,7 +748,7 @@ elements.confirmScanned.addEventListener("click", async () => {
     const inventoryByBarcode = new Map(inventory.map((item) => [item.product_barcode, item]));
     for (const [barcode, scannedItem] of items) {
       try {
-        const saved = await saveScannedItem(scannedItem, inventoryByBarcode, storageLocation, expiryDate);
+        const saved = await saveScannedItem(scannedItem, inventoryByBarcode, expiryDate);
         inventoryByBarcode.set(barcode, saved);
         scanSession.delete(barcode);
       } catch (error) {

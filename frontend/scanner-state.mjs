@@ -1,5 +1,6 @@
 export const BARCODE_EXIT_GRACE_MS = 700;
 export const BARCODE_EXIT_MISSES = 3;
+export const SCANNER_STORAGE_LOCATIONS = ["fridge", "freezer", "pantry", "other"];
 
 function normalizeBarcodes(rawValues) {
   return new Set(
@@ -75,7 +76,8 @@ export function addSessionUnit(session, barcode, product, onIncrement = () => {}
   const item = {
     product,
     quantity: (previous?.quantity || 0) + 1,
-    lastScannedAt: Date.now()
+    lastScannedAt: Date.now(),
+    storageLocation: previous?.storageLocation || null
   };
   session.set(barcode, item);
   try {
@@ -84,4 +86,15 @@ export function addSessionUnit(session, barcode, product, onIncrement = () => {}
     // Audio, vibration, or another optional feedback must never block scanning.
   }
   return item;
+}
+
+export function setSessionItemLocation(session, barcode, storageLocation) {
+  const item = session.get(barcode);
+  if (!item || !SCANNER_STORAGE_LOCATIONS.includes(storageLocation)) return false;
+  item.storageLocation = storageLocation;
+  return true;
+}
+
+export function sessionIsReadyToSave(session) {
+  return session.size > 0 && [...session.values()].every((item) => item.storageLocation);
 }

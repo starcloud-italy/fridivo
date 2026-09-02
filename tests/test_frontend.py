@@ -125,11 +125,18 @@ def test_scanner_summary_is_editable_and_only_saves_after_confirmation(client):
     assert "Continua a scansionare" in html
     assert 'id="confirm-scanned"' in html
     assert "Aggiungi alla dispensa" in html
-    assert 'name="scan-location"' in html
+    assert 'name="scan-location"' not in html
+    assert "data-summary-location" in script
+    for location in ("fridge", "freezer", "pantry", "other"):
+        assert f'value: "{location}"' in script
+    assert "setSessionItemLocation(scanSession" in script
+    assert "elements.confirmScanned.disabled = !sessionIsReadyToSave(scanSession)" in script
     assert 'id="scan-expiry-date"' in html
     assert 'method: "POST"' in script
     assert 'method: "PATCH"' in script
     assert "existing.quantity + scannedItem.quantity" in script
+    assert "const storageLocation = scannedItem.storageLocation" in script
+    assert "storage_location: storageLocation" in script
 
 
 def test_scanner_layout_is_mobile_first(client):

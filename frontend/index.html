@@ -248,7 +248,7 @@
       </div>
 
       <div id="scanner-summary" class="scanner-summary" hidden>
-        <p class="summary-intro">Controlla quantità e prodotti prima di aggiungerli.</p>
+        <p class="summary-intro">Controlla quantità e scegli la destinazione di ogni prodotto.</p>
         <div id="summary-empty" class="state-card small-state" hidden>
           <div class="state-icon" aria-hidden="true">0</div>
           <h2>Nessun prodotto scansionato</h2>
@@ -257,15 +257,6 @@
         <div id="summary-list" class="summary-list" aria-live="polite"></div>
 
         <div id="summary-options" class="summary-options">
-          <fieldset class="location-fieldset">
-            <legend>Posizione per questi prodotti</legend>
-            <div class="location-grid">
-              <label><input type="radio" name="scan-location" value="fridge" checked /><span>❄️ Frigorifero</span></label>
-              <label><input type="radio" name="scan-location" value="freezer" /><span>🧊 Congelatore</span></label>
-              <label><input type="radio" name="scan-location" value="pantry" /><span>🥫 Dispensa</span></label>
-              <label><input type="radio" name="scan-location" value="other" /><span>📍 Altro</span></label>
-            </div>
-          </fieldset>
           <div class="field">
             <label for="scan-expiry-date">Scadenza comune <span>opzionale</span></label>
             <input id="scan-expiry-date" type="date" />
