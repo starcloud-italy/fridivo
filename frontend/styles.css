@@ -84,6 +84,8 @@ button:disabled { cursor: wait; opacity: .68; }
 .product-card { position: relative; display: grid; grid-template-columns: 78px minmax(0,1fr); gap: 14px; min-height: 102px; padding: 12px; border: 1px solid rgba(63,107,87,.09); border-radius: 18px; background: var(--white); box-shadow: 0 6px 20px rgba(42,70,57,.055); }
 button.product-card { width: 100%; color: inherit; text-align: left; cursor: pointer; }
 button.product-card:hover { border-color: rgba(63,107,87,.3); }
+.inventory-item { grid-template-columns: 78px minmax(0,1fr) 18px; }
+.inventory-item:focus-visible { outline: 3px solid rgba(121,168,107,.3); outline-offset: 2px; }
 .product-image { width: 78px; height: 78px; align-self: center; border-radius: 13px; object-fit: contain; background: #f3f1eb; }
 .image-fallback { display: grid; place-items: center; color: #93a099; font-size: 28px; }
 .product-info { min-width: 0; align-self: center; padding-right: 2px; }
@@ -163,6 +165,15 @@ button.product-card:hover { border-color: rgba(63,107,87,.3); }
 .location-grid input:checked + span { border-color: var(--green); background: #edf3ec; color: var(--green-dark); }
 .location-grid input:focus-visible + span { outline: 3px solid rgba(121,168,107,.3); }
 body.sheet-open { overflow: hidden; }
+.inventory-expiry { margin: 7px 0 0; color: var(--muted); font-size: 12px; }
+.inventory-quantity-field { max-width: 210px; }
+.inventory-location-field { margin-bottom: 20px; }
+.inventory-remove-area { margin-top: 18px; padding-top: 15px; border-top: 1px solid var(--border); text-align: center; }
+.danger-text-button { min-height: 44px; border: 0; background: transparent; color: var(--danger); font-size: 14px; font-weight: 750; }
+.inventory-delete-confirm { margin-top: 8px; border-radius: 14px; padding: 14px; background: #fbecea; text-align: left; }
+.inventory-delete-confirm p { margin: 0 0 12px; color: var(--danger); font-size: 14px; line-height: 1.4; }
+.inventory-delete-confirm > div { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+.danger-button { min-height: 50px; border: 0; border-radius: 14px; padding: 0 18px; background: var(--danger); color: white; font-weight: 750; }
 
 .scanner-modal { position: fixed; z-index: 40; inset: 0; overflow-y: auto; overscroll-behavior: contain; background: var(--cream); padding: max(14px, env(safe-area-inset-top)) 16px calc(20px + env(safe-area-inset-bottom)); animation: fade-in .2s ease; }
 .scanner-header { display: flex; align-items: center; justify-content: space-between; max-width: 620px; margin: 0 auto 14px; }

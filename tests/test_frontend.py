@@ -95,8 +95,18 @@ def test_scanner_uses_per_barcode_presence_instead_of_time_cooldown(client):
     assert "observedAt - state.lastSeenAt >= this.graceMs" in scanner_state
     assert "/api/v1/products/barcode/${encodeURIComponent(barcode)}" in script
     assert "addSessionUnit(scanSession, barcode, product" in script
-    assert "Prodotto non riconosciuto" in script
     assert "navigator.vibrate(70)" in script
+
+
+def test_unknown_scanner_reads_are_silent_and_never_join_the_session(client):
+    script = client.get("/assets/app.js").text
+
+    assert "Prodotto non riconosciuto" not in script
+    assert "unknownScans" not in script
+    assert "if (error.status === 404)" in script
+    assert "Unknown or transient decoder reads are intentionally silent" in script
+    assert "for (let unit = 0; unit < units; unit += 1) commitScannedUnit(barcode, product)" in script
+    assert "provideUnitFeedback" in script
 
 
 def test_scanner_has_manual_increment_and_optional_local_audio_feedback(client):
@@ -147,3 +157,56 @@ def test_scanner_layout_is_mobile_first(client):
     assert ".camera-frame" in stylesheet
     assert "aspect-ratio: 4 / 3" in stylesheet
     assert "@media (max-width: 370px)" in stylesheet
+
+
+def test_inventory_cards_open_the_manual_management_sheet(client):
+    html = client.get("/").text
+    script = client.get("/assets/app.js").text
+
+    assert 'id="inventory-sheet"' in html
+    assert 'id="inventory-edit-product"' in html
+    assert 'id="inventory-edit-quantity"' in html
+    assert 'id="inventory-edit-location"' in html
+    assert 'data-inventory-id="${escapeHtml(item.id)}"' in script
+    assert "openInventorySheet(item, card)" in script
+    assert "item.expiry_date" in script
+
+
+def test_inventory_management_patches_quantity_and_location_and_updates_ui(client):
+    html = client.get("/").text
+    script = client.get("/assets/app.js").text
+
+    assert 'id="inventory-quantity-minus"' in html
+    assert 'id="inventory-quantity-plus"' in html
+    assert 'id="save-inventory-edit"' in html
+    assert 'data-inventory-location' in script
+    assert 'method: "PATCH"' in script
+    assert "quantity: inventoryEditQuantity" in script
+    assert "storage_location: inventoryEditLocation" in script
+    assert "inventoryItems = inventoryItems.map" in script
+    assert "renderInventory(inventoryItems)" in script
+
+
+def test_inventory_manual_removal_requires_confirmation_and_updates_ui(client):
+    html = client.get("/").text
+    script = client.get("/assets/app.js").text
+
+    assert 'id="remove-inventory-item"' in html
+    assert 'id="inventory-delete-confirm"' in html
+    assert 'id="cancel-remove-inventory-item"' in html
+    assert 'id="confirm-remove-inventory-item"' in html
+    assert 'method: "DELETE"' in script
+    assert "inventoryItems = inventoryItems.filter" in script
+    assert "Prodotto rimosso dalla dispensa" in script
+
+
+def test_inventory_management_reuses_mobile_scanner_location_controls(client):
+    html = client.get("/").text
+    stylesheet = client.get("/assets/styles.css").text
+    script = client.get("/assets/app.js").text
+
+    assert 'class="summary-location-field inventory-location-field"' in html
+    assert 'class="summary-location-grid"' in html
+    assert 'renderSummaryLocationButtons(inventoryEditLocation, "inventory-location")' in script
+    assert ".summary-location-button" in stylesheet
+    assert "min-height: 52px" in stylesheet

@@ -22,6 +22,10 @@ const elements = {
   backdrop: $("#sheet-backdrop"), sheet: $("#add-sheet"), selectedProduct: $("#selected-product"),
   addForm: $("#add-form"), addError: $("#add-error"), confirmAdd: $("#confirm-add"),
   quantityValue: $("#quantity-value"), expiryDate: $("#expiry-date"), toast: $("#toast"),
+  inventorySheet: $("#inventory-sheet"), inventoryEditForm: $("#inventory-edit-form"),
+  inventoryEditProduct: $("#inventory-edit-product"), inventoryEditQuantity: $("#inventory-edit-quantity"),
+  inventoryEditLocation: $("#inventory-edit-location"), inventoryEditError: $("#inventory-edit-error"),
+  saveInventoryEdit: $("#save-inventory-edit"), inventoryDeleteConfirm: $("#inventory-delete-confirm"),
   scannerModal: $("#scanner-modal"), scannerLive: $("#scanner-live"), scannerSummary: $("#scanner-summary"),
   scannerVideo: $("#scanner-video"), cameraLoading: $("#camera-loading"), cameraError: $("#camera-error"),
   cameraErrorMessage: $("#camera-error-message"), scanFeedback: $("#scan-feedback"), scanFeedbackText: $("#scan-feedback-text"),
@@ -34,6 +38,10 @@ const elements = {
 let token = sessionStorage.getItem(TOKEN_KEY);
 let selectedProduct = null;
 let quantity = 1;
+let inventoryItems = [];
+let selectedInventoryItem = null;
+let inventoryEditQuantity = 1;
+let inventoryEditLocation = null;
 let toastTimer;
 let lastFocusedElement;
 let scannerStream = null;
@@ -51,7 +59,6 @@ const scanSession = new Map();
 const barcodePresence = new BarcodePresenceTracker();
 const scanLookups = new Set();
 const pendingScanUnits = new Map();
-const unknownScans = [];
 const BARCODE_FORMATS = ["ean_13", "ean_8", "upc_a", "upc_e"];
 const HELD_NOTICE_DELAY_MS = 1200;
 
@@ -103,6 +110,7 @@ function showLogin(message = "") {
   elements.authenticated.hidden = true;
   elements.login.hidden = false;
   closeSheet();
+  closeInventorySheet();
   closeScanner();
   setMessage(elements.loginError, message);
 }
@@ -164,7 +172,7 @@ function renderInventory(items) {
   elements.inventoryCount.hidden = items.length === 0;
   elements.inventoryEmpty.hidden = items.length !== 0;
   elements.inventoryList.innerHTML = sorted.map((item) => `
-    <article class="product-card">
+    <button class="product-card inventory-item" type="button" data-inventory-id="${escapeHtml(item.id)}" aria-label="Modifica ${escapeHtml(item.product_name || "prodotto")}">
       ${productImage(item)}
       <div class="product-info">
         <h2 class="product-name">${escapeHtml(item.product_name || "Prodotto")}</h2>
@@ -176,7 +184,8 @@ function renderInventory(items) {
           ${expiryMeta(item.expiry_date)}
         </div>
       </div>
-    </article>`).join("");
+      <span class="select-cue" aria-hidden="true">›</span>
+    </button>`).join("");
 }
 
 async function loadInventory() {
@@ -185,7 +194,8 @@ async function loadInventory() {
   elements.inventoryEmpty.hidden = true;
   elements.inventoryList.innerHTML = "";
   try {
-    renderInventory(await api("/api/v1/inventory"));
+    inventoryItems = await api("/api/v1/inventory");
+    renderInventory(inventoryItems);
   } catch (error) {
     if (error.status !== 401) elements.inventoryError.hidden = false;
   } finally {
@@ -264,6 +274,41 @@ function closeSheet() {
   elements.backdrop.hidden = true;
   document.body.classList.remove("sheet-open");
   selectedProduct = null;
+  lastFocusedElement?.focus();
+}
+
+function formatInventoryDate(dateValue) {
+  if (!dateValue) return "Nessuna scadenza";
+  return `Scadenza ${new Intl.DateTimeFormat("it-IT", { day: "numeric", month: "long", year: "numeric" }).format(new Date(`${dateValue}T00:00:00`))}`;
+}
+
+function renderInventoryEditLocation() {
+  elements.inventoryEditLocation.innerHTML = renderSummaryLocationButtons(inventoryEditLocation, "inventory-location");
+}
+
+function openInventorySheet(item, trigger) {
+  selectedInventoryItem = item;
+  inventoryEditQuantity = item.quantity;
+  inventoryEditLocation = item.storage_location;
+  elements.inventoryEditQuantity.textContent = inventoryEditQuantity;
+  elements.inventoryEditProduct.innerHTML = `${productImage(item)}<div><h3 class="product-name">${escapeHtml(item.product_name || "Prodotto")}</h3>${item.brands ? `<p class="product-brand">${escapeHtml(item.brands)}</p>` : ""}<p class="inventory-expiry">${escapeHtml(formatInventoryDate(item.expiry_date))}</p></div>`;
+  renderInventoryEditLocation();
+  setMessage(elements.inventoryEditError);
+  elements.inventoryDeleteConfirm.hidden = true;
+  lastFocusedElement = trigger || document.activeElement;
+  elements.backdrop.hidden = false;
+  elements.inventorySheet.hidden = false;
+  document.body.classList.add("sheet-open");
+  setTimeout(() => $("#inventory-quantity-minus").focus(), 50);
+}
+
+function closeInventorySheet() {
+  if (elements.inventorySheet.hidden) return;
+  elements.inventorySheet.hidden = true;
+  elements.backdrop.hidden = true;
+  elements.inventoryDeleteConfirm.hidden = true;
+  document.body.classList.remove("sheet-open");
+  selectedInventoryItem = null;
   lastFocusedElement?.focus();
 }
 
@@ -355,13 +400,8 @@ function renderScanSession() {
       <div><p class="product-name">${escapeHtml(product.name || "Prodotto")}</p>${product.brands ? `<p class="product-brand">${escapeHtml(product.brands)}</p>` : ""}</div>
       <span class="scan-quantity">×${itemQuantity}</span>
     </div>`);
-  const unknownRows = unknownScans.slice(0, Math.max(0, 4 - knownRows.length)).map(({ barcode }) => `
-    <div class="scan-recent-item">
-      <div class="product-image image-fallback" aria-hidden="true">?</div>
-      <div><p class="product-name">Prodotto non riconosciuto</p><p class="product-brand">${escapeHtml(barcode)}</p></div>
-    </div>`);
-  elements.scanRecent.innerHTML = knownRows.length || unknownRows.length
-    ? [...knownRows, ...unknownRows].join("")
+  elements.scanRecent.innerHTML = knownRows.length
+    ? knownRows.join("")
     : '<p class="scan-empty">I prodotti riconosciuti appariranno qui.</p>';
 }
 
@@ -420,9 +460,7 @@ async function lookupScannedBarcode(barcode) {
     for (let unit = 0; unit < units; unit += 1) commitScannedUnit(barcode, product);
   } catch (error) {
     if (error.status === 404) {
-      unknownScans.unshift({ barcode, scannedAt: Date.now() });
-      renderScanSession();
-      setScanFeedback("Prodotto non riconosciuto", "warning");
+      // Unknown or transient decoder reads are intentionally silent during continuous scanning.
     } else if (error.status !== 401) {
       setScanFeedback("Errore di lookup. Continua con il prossimo prodotto.", "warning");
     }
@@ -545,7 +583,6 @@ function openScanner() {
   barcodePresence.clear();
   scanLookups.clear();
   pendingScanUnits.clear();
-  unknownScans.length = 0;
   elements.scanExpiryDate.value = "";
   setMessage(elements.scannerSaveError);
   renderScanSession();
@@ -569,10 +606,10 @@ function closeScanner() {
   lastFocusedElement?.focus();
 }
 
-function renderSummaryLocationButtons(selectedLocation) {
+function renderSummaryLocationButtons(selectedLocation, dataAttribute = "summary-location") {
   return summaryStorageLocations.map(({ value, label, icon }) => `
     <button class="summary-location-button${selectedLocation === value ? " selected" : ""}" type="button"
-      data-summary-location="${value}" aria-pressed="${selectedLocation === value}" aria-label="${label}">
+      data-${dataAttribute}="${value}" aria-pressed="${selectedLocation === value}" aria-label="${label}">
       ${icon}<span>${label}</span>
     </button>`).join("");
 }
@@ -680,6 +717,12 @@ $("#toggle-password").addEventListener("click", () => {
 
 $("#logout-button").addEventListener("click", () => { clearSession(); showLogin(); });
 $("#retry-inventory").addEventListener("click", loadInventory);
+elements.inventoryList.addEventListener("click", (event) => {
+  const card = event.target.closest("[data-inventory-id]");
+  if (!card) return;
+  const item = inventoryItems.find((candidate) => String(candidate.id) === card.dataset.inventoryId);
+  if (item) openInventorySheet(item, card);
+});
 $$('.add-product-trigger').forEach((button) => button.addEventListener("click", () => showView("search")));
 $$('.nav-item').forEach((button) => button.addEventListener("click", () => showView(button.dataset.view)));
 $("#open-scanner").addEventListener("click", openScanner);
@@ -789,13 +832,78 @@ elements.searchForm.addEventListener("submit", (event) => {
 });
 
 $("#close-sheet").addEventListener("click", closeSheet);
-elements.backdrop.addEventListener("click", closeSheet);
+$("#close-inventory-sheet").addEventListener("click", closeInventorySheet);
+elements.backdrop.addEventListener("click", () => {
+  if (!elements.inventorySheet.hidden) closeInventorySheet(); else closeSheet();
+});
 document.addEventListener("keydown", (event) => {
   if (event.key !== "Escape") return;
-  if (!elements.scannerModal.hidden) closeScanner(); else closeSheet();
+  if (!elements.scannerModal.hidden) closeScanner();
+  else if (!elements.inventorySheet.hidden) closeInventorySheet();
+  else closeSheet();
 });
 $("#quantity-minus").addEventListener("click", () => { quantity = Math.max(1, quantity - 1); elements.quantityValue.textContent = quantity; });
 $("#quantity-plus").addEventListener("click", () => { quantity += 1; elements.quantityValue.textContent = quantity; });
+
+$("#inventory-quantity-minus").addEventListener("click", () => {
+  inventoryEditQuantity = Math.max(1, inventoryEditQuantity - 1);
+  elements.inventoryEditQuantity.textContent = inventoryEditQuantity;
+});
+$("#inventory-quantity-plus").addEventListener("click", () => {
+  inventoryEditQuantity += 1;
+  elements.inventoryEditQuantity.textContent = inventoryEditQuantity;
+});
+elements.inventoryEditLocation.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-inventory-location]");
+  if (!button) return;
+  inventoryEditLocation = button.dataset.inventoryLocation;
+  renderInventoryEditLocation();
+});
+elements.inventoryEditForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!selectedInventoryItem) return;
+  setMessage(elements.inventoryEditError);
+  setLoading(elements.saveInventoryEdit, true);
+  try {
+    const updated = await api(`/api/v1/inventory/${selectedInventoryItem.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ quantity: inventoryEditQuantity, storage_location: inventoryEditLocation })
+    });
+    inventoryItems = inventoryItems.map((item) => item.id === updated.id ? updated : item);
+    renderInventory(inventoryItems);
+    closeInventorySheet();
+    showToast("Prodotto aggiornato");
+  } catch (error) {
+    if (error.status !== 401) setMessage(elements.inventoryEditError, userMessage(error, "inventory"));
+  } finally {
+    setLoading(elements.saveInventoryEdit, false);
+  }
+});
+$("#remove-inventory-item").addEventListener("click", () => {
+  elements.inventoryDeleteConfirm.hidden = false;
+  $("#confirm-remove-inventory-item").focus();
+});
+$("#cancel-remove-inventory-item").addEventListener("click", () => {
+  elements.inventoryDeleteConfirm.hidden = true;
+});
+$("#confirm-remove-inventory-item").addEventListener("click", async () => {
+  if (!selectedInventoryItem) return;
+  const itemId = selectedInventoryItem.id;
+  const button = $("#confirm-remove-inventory-item");
+  setMessage(elements.inventoryEditError);
+  setLoading(button, true);
+  try {
+    await api(`/api/v1/inventory/${itemId}`, { method: "DELETE" });
+    inventoryItems = inventoryItems.filter((item) => item.id !== itemId);
+    renderInventory(inventoryItems);
+    closeInventorySheet();
+    showToast("Prodotto rimosso dalla dispensa");
+  } catch (error) {
+    if (error.status !== 401) setMessage(elements.inventoryEditError, userMessage(error, "inventory"));
+  } finally {
+    setLoading(button, false);
+  }
+});
 
 elements.addForm.addEventListener("submit", async (event) => {
   event.preventDefault();

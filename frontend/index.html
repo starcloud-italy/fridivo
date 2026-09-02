@@ -203,6 +203,45 @@
       </form>
     </section>
 
+    <section id="inventory-sheet" class="bottom-sheet inventory-sheet" role="dialog" aria-modal="true" aria-labelledby="inventory-sheet-title" hidden>
+      <div class="sheet-handle" aria-hidden="true"></div>
+      <div class="sheet-header">
+        <h2 id="inventory-sheet-title">Gestisci prodotto</h2>
+        <button id="close-inventory-sheet" class="icon-button" type="button" aria-label="Chiudi">×</button>
+      </div>
+      <form id="inventory-edit-form">
+        <div id="inventory-edit-product" class="selected-product"></div>
+        <div class="field quantity-field inventory-quantity-field">
+          <label>Quantità attuale</label>
+          <div class="stepper" aria-label="Quantità attuale">
+            <button id="inventory-quantity-minus" type="button" aria-label="Diminuisci quantità">−</button>
+            <output id="inventory-edit-quantity" aria-live="polite">1</output>
+            <button id="inventory-quantity-plus" type="button" aria-label="Aumenta quantità">+</button>
+          </div>
+        </div>
+        <fieldset class="summary-location-field inventory-location-field">
+          <legend>Posizione</legend>
+          <div id="inventory-edit-location" class="summary-location-grid"></div>
+        </fieldset>
+        <div id="inventory-edit-error" class="inline-message error" role="alert" hidden></div>
+        <button id="save-inventory-edit" class="primary-button full-width" type="submit">
+          <span>Salva modifiche</span><span class="button-spinner" aria-hidden="true"></span>
+        </button>
+        <div class="inventory-remove-area">
+          <button id="remove-inventory-item" class="danger-text-button" type="button">Rimuovi dalla dispensa</button>
+          <div id="inventory-delete-confirm" class="inventory-delete-confirm" role="alert" hidden>
+            <p>Vuoi davvero rimuovere questo prodotto dalla dispensa?</p>
+            <div>
+              <button id="cancel-remove-inventory-item" class="secondary-button" type="button">Annulla</button>
+              <button id="confirm-remove-inventory-item" class="danger-button" type="button">
+                <span>Rimuovi</span><span class="button-spinner" aria-hidden="true"></span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </form>
+    </section>
+
     <section id="scanner-modal" class="scanner-modal" role="dialog" aria-modal="true" aria-labelledby="scanner-title" hidden>
       <header class="scanner-header">
         <div>
