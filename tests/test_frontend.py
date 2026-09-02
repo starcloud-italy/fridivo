@@ -11,6 +11,7 @@ def test_frontend_is_served_from_root(client):
 def test_frontend_assets_and_runtime_config_are_available(client):
     stylesheet = client.get("/assets/styles.css")
     script = client.get("/assets/app.js")
+    scanner_state = client.get("/assets/scanner-state.mjs")
     zxing = client.get("/assets/vendor/zxing-browser-0.2.1.min.js")
     zxing_license = client.get("/assets/vendor/ZXING-LICENSE.txt")
     config = client.get("/app-config.js")
@@ -18,6 +19,8 @@ def test_frontend_assets_and_runtime_config_are_available(client):
     assert stylesheet.status_code == 200
     assert "#3f6b57" in stylesheet.text.lower()
     assert script.status_code == 200
+    assert scanner_state.status_code == 200
+    assert "class BarcodePresenceTracker" in scanner_state.text
     assert '"/api/v1/auth/login"' in script.text
     assert '"/api/v1/inventory"' in script.text
     assert "/api/v1/products/search?q=" in script.text
@@ -78,18 +81,37 @@ def test_scanner_has_camera_errors_continuous_session_and_finish_controls(client
     assert "decodeFromConstraints" in script
 
 
-def test_scanner_looks_up_and_groups_barcodes_with_per_code_cooldown(client):
+def test_scanner_uses_per_barcode_presence_instead_of_time_cooldown(client):
     script = client.get("/assets/app.js").text
+    scanner_state = client.get("/assets/scanner-state.mjs").text
 
     assert "const scanSession = new Map()" in script
-    assert "const scanCooldowns = new Map()" in script
-    assert "BARCODE_COOLDOWN_MS = 1100" in script
-    assert "scanCooldowns.get(barcode)" in script
-    assert "scanCooldowns.set(barcode, now)" in script
+    assert "new BarcodePresenceTracker()" in script
+    assert "barcodePresence.observe(rawValues, observedAt, { completeFrame })" in script
+    assert "BARCODE_COOLDOWN_MS" not in script
+    assert "BARCODE_EXIT_GRACE_MS = 700" in scanner_state
+    assert "BARCODE_EXIT_MISSES = 3" in scanner_state
+    assert "state.missedAttempts >= this.requiredMisses" in scanner_state
+    assert "observedAt - state.lastSeenAt >= this.graceMs" in scanner_state
     assert "/api/v1/products/barcode/${encodeURIComponent(barcode)}" in script
-    assert "(previous?.quantity || 0) + 1" in script
+    assert "addSessionUnit(scanSession, barcode, product" in script
     assert "Prodotto non riconosciuto" in script
     assert "navigator.vibrate(70)" in script
+
+
+def test_scanner_has_manual_increment_and_optional_local_audio_feedback(client):
+    html = client.get("/").text
+    script = client.get("/assets/app.js").text
+
+    assert 'id="scan-add-one"' in html
+    assert ">+1</button>" in html
+    assert "window.AudioContext || window.webkitAudioContext" in script
+    assert "initializeScanAudio();" in script
+    assert 'oscillator.type = "sine"' in script
+    assert "oscillator.frequency.setValueAtTime(880" in script
+    assert "playScanBeep();" in script
+    assert "Audio is optional" in script
+    assert "commitScannedUnit(manualAddBarcode, item.product, true)" in script
 
 
 def test_scanner_summary_is_editable_and_only_saves_after_confirmation(client):

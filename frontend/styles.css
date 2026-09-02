@@ -186,6 +186,7 @@ body.sheet-open { overflow: hidden; }
 .scan-feedback.success .feedback-dot { background: var(--green); }
 .scan-feedback.warning { background: #fff0df; color: #8b541c; }
 .scan-feedback.warning .feedback-dot { background: var(--accent); }
+.scan-add-one { min-width: 48px; min-height: 38px; margin-left: auto; border: 0; border-radius: 10px; padding: 0 12px; background: var(--green); color: white; font-weight: 850; }
 .scan-session { border-radius: 18px; padding: 14px; background: white; box-shadow: 0 6px 20px rgba(42,70,57,.055); }
 .scan-session-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .scan-session-heading h3 { margin: 0; font-size: 15px; }

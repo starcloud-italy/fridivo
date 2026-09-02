@@ -1,3 +1,5 @@
+import { BarcodePresenceTracker, addSessionUnit } from "./scanner-state.mjs";
+
 const config = window.__FRIDIVO_CONFIG__ || {};
 const API_BASE_URL = String(config.apiBaseUrl || "").replace(/\/$/, "");
 const TOKEN_KEY = "fridivo_access_token";
@@ -17,7 +19,8 @@ const elements = {
   quantityValue: $("#quantity-value"), expiryDate: $("#expiry-date"), toast: $("#toast"),
   scannerModal: $("#scanner-modal"), scannerLive: $("#scanner-live"), scannerSummary: $("#scanner-summary"),
   scannerVideo: $("#scanner-video"), cameraLoading: $("#camera-loading"), cameraError: $("#camera-error"),
-  cameraErrorMessage: $("#camera-error-message"), scanFeedback: $("#scan-feedback"), scanRecent: $("#scan-recent"),
+  cameraErrorMessage: $("#camera-error-message"), scanFeedback: $("#scan-feedback"), scanFeedbackText: $("#scan-feedback-text"),
+  scanAddOne: $("#scan-add-one"), scanRecent: $("#scan-recent"),
   scanTotal: $("#scan-total"), summaryList: $("#summary-list"), summaryEmpty: $("#summary-empty"),
   summaryOptions: $("#summary-options"), scanExpiryDate: $("#scan-expiry-date"),
   scannerSaveError: $("#scanner-save-error"), confirmScanned: $("#confirm-scanned")
@@ -36,12 +39,16 @@ let cameraStartId = 0;
 let scannerActive = false;
 let detectionPending = false;
 let feedbackTimer;
+let scanAudioContext = null;
+let nextScanBeepAt = 0;
+let manualAddBarcode = null;
 const scanSession = new Map();
-const scanCooldowns = new Map();
+const barcodePresence = new BarcodePresenceTracker();
 const scanLookups = new Set();
+const pendingScanUnits = new Map();
 const unknownScans = [];
-const BARCODE_COOLDOWN_MS = 1100;
 const BARCODE_FORMATS = ["ean_13", "ean_8", "upc_a", "upc_e"];
+const HELD_NOTICE_DELAY_MS = 1200;
 
 class ApiError extends Error {
   constructor(status, detail) { super(detail); this.status = status; }
@@ -260,13 +267,71 @@ function scannedUnitCount() {
   return [...scanSession.values()].reduce((total, item) => total + item.quantity, 0);
 }
 
-function setScanFeedback(message, type = "", reset = true) {
+function setScanFeedback(message, type = "", reset = true, manualBarcode = null) {
   clearTimeout(feedbackTimer);
   elements.scanFeedback.className = `scan-feedback ${type}`.trim();
-  elements.scanFeedback.querySelector("span:last-child").textContent = message;
+  elements.scanFeedbackText.textContent = message;
+  manualAddBarcode = manualBarcode;
+  elements.scanAddOne.hidden = !manualBarcode;
   if (reset && scannerActive) {
     feedbackTimer = setTimeout(() => setScanFeedback("Inquadra il prossimo barcode", "", false), 1600);
   }
+}
+
+function initializeScanAudio() {
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) return;
+  try {
+    if (!scanAudioContext) scanAudioContext = new AudioContextClass();
+    if (scanAudioContext.state === "suspended") scanAudioContext.resume().catch(() => {});
+    const oscillator = scanAudioContext.createOscillator();
+    const gain = scanAudioContext.createGain();
+    gain.gain.value = 0;
+    oscillator.connect(gain);
+    gain.connect(scanAudioContext.destination);
+    oscillator.start();
+    oscillator.stop(scanAudioContext.currentTime + 0.005);
+  } catch {
+    scanAudioContext = null;
+  }
+}
+
+function playScanBeep() {
+  if (!scanAudioContext || scanAudioContext.state === "closed") return;
+  try {
+    if (scanAudioContext.state === "suspended") scanAudioContext.resume().catch(() => {});
+    const now = Math.max(scanAudioContext.currentTime, nextScanBeepAt);
+    nextScanBeepAt = now + 0.09;
+    const oscillator = scanAudioContext.createOscillator();
+    const gain = scanAudioContext.createGain();
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(880, now);
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.055, now + 0.008);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.065);
+    oscillator.connect(gain);
+    gain.connect(scanAudioContext.destination);
+    oscillator.start(now);
+    oscillator.stop(now + 0.07);
+  } catch {
+    // Audio is optional; visual feedback and scanning continue normally.
+  }
+}
+
+function provideUnitFeedback() {
+  playScanBeep();
+  if (navigator.vibrate) navigator.vibrate(70);
+}
+
+function commitScannedUnit(barcode, product, keepManualAction = false) {
+  const item = addSessionUnit(scanSession, barcode, product, provideUnitFeedback);
+  renderScanSession();
+  if (keepManualAction) {
+    setScanFeedback(`Già scansionato · ${product.name || "Prodotto"} ×${item.quantity}`, "", false, barcode);
+  } else {
+    setScanFeedback(`${product.name || "Prodotto"} · ×${item.quantity}`, "success");
+  }
+  return item;
 }
 
 function renderScanSession() {
@@ -332,19 +397,16 @@ function stopCamera() {
 }
 
 async function lookupScannedBarcode(barcode) {
-  if (scanLookups.has(barcode)) return;
+  if (scanLookups.has(barcode)) {
+    pendingScanUnits.set(barcode, (pendingScanUnits.get(barcode) || 0) + 1);
+    return;
+  }
   scanLookups.add(barcode);
+  pendingScanUnits.set(barcode, 1);
   try {
     const product = await api(`/api/v1/products/barcode/${encodeURIComponent(barcode)}`);
-    const previous = scanSession.get(barcode);
-    scanSession.set(barcode, {
-      product,
-      quantity: (previous?.quantity || 0) + 1,
-      lastScannedAt: Date.now()
-    });
-    if (navigator.vibrate) navigator.vibrate(70);
-    renderScanSession();
-    setScanFeedback(`${product.name || "Prodotto"} · ×${scanSession.get(barcode).quantity}`, "success");
+    const units = pendingScanUnits.get(barcode) || 1;
+    for (let unit = 0; unit < units; unit += 1) commitScannedUnit(barcode, product);
   } catch (error) {
     if (error.status === 404) {
       unknownScans.unshift({ barcode, scannedAt: Date.now() });
@@ -355,17 +417,40 @@ async function lookupScannedBarcode(barcode) {
     }
   } finally {
     scanLookups.delete(barcode);
+    pendingScanUnits.delete(barcode);
   }
 }
 
-function acceptDetectedBarcode(rawValue) {
-  const barcode = String(rawValue || "").trim();
-  if (!/^\d{8,14}$/.test(barcode)) return false;
-  const now = Date.now();
-  if (now - (scanCooldowns.get(barcode) || 0) < BARCODE_COOLDOWN_MS || scanLookups.has(barcode)) return false;
-  scanCooldowns.set(barcode, now);
-  lookupScannedBarcode(barcode);
-  return true;
+function registerBarcodeEntry(barcode) {
+  const knownItem = scanSession.get(barcode);
+  if (knownItem) commitScannedUnit(barcode, knownItem.product);
+  else lookupScannedBarcode(barcode);
+}
+
+function showHeldBarcodeAction(barcode) {
+  const item = scanSession.get(barcode);
+  if (!item) return;
+  barcodePresence.markBlockedNoticeShown(barcode);
+  setScanFeedback(`Già scansionato · ${item.product.name || "Prodotto"} ×${item.quantity}`, "", false, barcode);
+}
+
+function handleDetectionAttempt(rawValues, observedAt = Date.now(), completeFrame = true) {
+  const events = barcodePresence.observe(rawValues, observedAt, { completeFrame });
+  for (const barcode of events.exited) {
+    if (manualAddBarcode === barcode) setScanFeedback("Inquadra il prossimo barcode", "", false);
+  }
+  for (const barcode of events.held) {
+    const state = barcodePresence.stateFor(barcode);
+    if (
+      state
+      && !state.blockedNoticeShown
+      && observedAt - state.enteredAt >= HELD_NOTICE_DELAY_MS
+    ) {
+      showHeldBarcodeAction(barcode);
+    }
+  }
+  for (const barcode of events.entered) registerBarcodeEntry(barcode);
+  return events;
 }
 
 async function detectBarcodeFrame() {
@@ -374,7 +459,7 @@ async function detectBarcodeFrame() {
     detectionPending = true;
     try {
       const results = await scannerDetector.detect(elements.scannerVideo);
-      for (const result of results) acceptDetectedBarcode(result.rawValue);
+      handleDetectionAttempt(results.map((result) => result.rawValue));
     } catch (error) {
       if (error.name !== "InvalidStateError") showCameraError(error);
     } finally {
@@ -421,7 +506,7 @@ async function startCamera() {
         delayBetweenScanSuccess: 250
       });
       const controlsPromise = codeReader.decodeFromConstraints(constraints, elements.scannerVideo, (result) => {
-        if (result) acceptDetectedBarcode(result.getText());
+        handleDetectionAttempt(result ? [result.getText()] : [], Date.now(), false);
       });
       controlsPromise.then((controls) => {
         if (startId !== cameraStartId) controls.stop();
@@ -446,8 +531,9 @@ async function startCamera() {
 
 function openScanner() {
   scanSession.clear();
-  scanCooldowns.clear();
+  barcodePresence.clear();
   scanLookups.clear();
+  pendingScanUnits.clear();
   unknownScans.length = 0;
   elements.scanExpiryDate.value = "";
   $("input[name='scan-location'][value='fridge']").checked = true;
@@ -459,6 +545,7 @@ function openScanner() {
   elements.authenticated.inert = true;
   document.body.classList.add("scanner-open");
   lastFocusedElement = document.activeElement;
+  initializeScanAudio();
   startCamera();
 }
 
@@ -569,6 +656,11 @@ $("#open-scanner").addEventListener("click", openScanner);
 $("#close-scanner").addEventListener("click", closeScanner);
 $("#finish-scanning").addEventListener("click", finishScanning);
 $("#resume-scanning").addEventListener("click", resumeScanning);
+elements.scanAddOne.addEventListener("click", () => {
+  if (!manualAddBarcode) return;
+  const item = scanSession.get(manualAddBarcode);
+  if (item) commitScannedUnit(manualAddBarcode, item.product, true);
+});
 $("#scanner-manual-search").addEventListener("click", () => {
   closeScanner();
   setTimeout(() => elements.searchInput.focus(), 50);

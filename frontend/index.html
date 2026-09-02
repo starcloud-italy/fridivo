@@ -228,9 +228,10 @@
           </div>
         </div>
 
-        <div id="scan-feedback" class="scan-feedback" role="status" aria-live="polite">
+        <div id="scan-feedback" class="scan-feedback">
           <span class="feedback-dot" aria-hidden="true"></span>
-          <span>Inquadra un barcode</span>
+          <span id="scan-feedback-text" role="status" aria-live="polite">Inquadra un barcode</span>
+          <button id="scan-add-one" class="scan-add-one" type="button" hidden>+1</button>
         </div>
 
         <section class="scan-session" aria-labelledby="scan-session-title">
