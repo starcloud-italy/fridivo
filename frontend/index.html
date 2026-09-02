@@ -9,6 +9,7 @@
     <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/assets/styles.css" />
     <script src="/app-config.js"></script>
+    <script defer src="/assets/vendor/zxing-browser-0.2.1.min.js"></script>
     <script type="module" src="/assets/app.js"></script>
   </head>
   <body>
@@ -104,9 +105,17 @@
             <div class="page-heading compact-heading">
               <div>
                 <p class="eyebrow">Aggiungi</p>
-                <h1 id="search-title">Cerca un prodotto</h1>
+                <h1 id="search-title">Aggiungi prodotti</h1>
               </div>
             </div>
+            <button id="open-scanner" class="scanner-entry" type="button">
+              <span class="scanner-entry-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M8 9v6M11 9v6M14 9v6M17 9v6"/></svg>
+              </span>
+              <span><strong>Scansiona barcode</strong><small>Fotocamera continua per più prodotti</small></span>
+              <span class="select-cue" aria-hidden="true">›</span>
+            </button>
+            <div class="manual-divider"><span>oppure cerca manualmente</span></div>
             <form id="search-form" class="search-form" role="search">
               <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
               <input id="search-input" name="q" type="search" enterkeyhint="search" autocomplete="off" placeholder="Es. yogurt, pasta, latte…" aria-label="Cerca nel catalogo" />
@@ -192,6 +201,83 @@
           <span>Aggiungi alla dispensa</span><span class="button-spinner" aria-hidden="true"></span>
         </button>
       </form>
+    </section>
+
+    <section id="scanner-modal" class="scanner-modal" role="dialog" aria-modal="true" aria-labelledby="scanner-title" hidden>
+      <header class="scanner-header">
+        <div>
+          <p class="eyebrow">Aggiunta rapida</p>
+          <h2 id="scanner-title">Scansiona i prodotti</h2>
+        </div>
+        <button id="close-scanner" class="icon-button scanner-close" type="button" aria-label="Chiudi scanner">×</button>
+      </header>
+
+      <div id="scanner-live" class="scanner-live">
+        <div id="camera-frame" class="camera-frame">
+          <video id="scanner-video" playsinline muted aria-label="Inquadratura della fotocamera"></video>
+          <div class="scan-guide" aria-hidden="true"><span></span></div>
+          <div id="camera-loading" class="camera-state">
+            <span class="camera-spinner" aria-hidden="true"></span>
+            <strong>Avvio fotocamera…</strong>
+          </div>
+          <div id="camera-error" class="camera-state camera-error" role="alert" hidden>
+            <span aria-hidden="true">!</span>
+            <strong>Fotocamera non disponibile</strong>
+            <p id="camera-error-message"></p>
+            <button id="scanner-manual-search" class="secondary-button" type="button">Usa la ricerca manuale</button>
+          </div>
+        </div>
+
+        <div id="scan-feedback" class="scan-feedback" role="status" aria-live="polite">
+          <span class="feedback-dot" aria-hidden="true"></span>
+          <span>Inquadra un barcode</span>
+        </div>
+
+        <section class="scan-session" aria-labelledby="scan-session-title">
+          <div class="scan-session-heading">
+            <h3 id="scan-session-title">Ultimi prodotti</h3>
+            <span id="scan-total" class="count-badge">0 unità</span>
+          </div>
+          <div id="scan-recent" class="scan-recent" aria-live="polite">
+            <p class="scan-empty">I prodotti riconosciuti appariranno qui.</p>
+          </div>
+        </section>
+
+        <button id="finish-scanning" class="primary-button full-width scanner-action" type="button">Termina scansione</button>
+      </div>
+
+      <div id="scanner-summary" class="scanner-summary" hidden>
+        <p class="summary-intro">Controlla quantità e prodotti prima di aggiungerli.</p>
+        <div id="summary-empty" class="state-card small-state" hidden>
+          <div class="state-icon" aria-hidden="true">0</div>
+          <h2>Nessun prodotto scansionato</h2>
+          <p>Torna alla scansione o usa la ricerca manuale.</p>
+        </div>
+        <div id="summary-list" class="summary-list" aria-live="polite"></div>
+
+        <div id="summary-options" class="summary-options">
+          <fieldset class="location-fieldset">
+            <legend>Posizione per questi prodotti</legend>
+            <div class="location-grid">
+              <label><input type="radio" name="scan-location" value="fridge" checked /><span>❄️ Frigorifero</span></label>
+              <label><input type="radio" name="scan-location" value="freezer" /><span>🧊 Congelatore</span></label>
+              <label><input type="radio" name="scan-location" value="pantry" /><span>🥫 Dispensa</span></label>
+              <label><input type="radio" name="scan-location" value="other" /><span>📍 Altro</span></label>
+            </div>
+          </fieldset>
+          <div class="field">
+            <label for="scan-expiry-date">Scadenza comune <span>opzionale</span></label>
+            <input id="scan-expiry-date" type="date" />
+          </div>
+        </div>
+        <div id="scanner-save-error" class="inline-message error" role="alert" hidden></div>
+        <div class="summary-actions">
+          <button id="resume-scanning" class="secondary-button" type="button">Continua a scansionare</button>
+          <button id="confirm-scanned" class="primary-button" type="button">
+            <span>Aggiungi alla dispensa</span><span class="button-spinner" aria-hidden="true"></span>
+          </button>
+        </div>
+      </div>
     </section>
 
     <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>

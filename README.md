@@ -66,7 +66,16 @@ Ogni prodotto può comparire una sola volta per household. Il catalogo viene con
 
 ## Interfaccia V1
 
-Il frontend statico non richiede una build Node o dipendenze JavaScript. Offre soltanto il
-ciclo iniziale richiesto: login, visualizzazione dispensa, ricerca nel catalogo e aggiunta
-di un prodotto. FastAPI serve i file statici e una piccola configurazione runtime; tutte le
+Il frontend statico non richiede una build Node o dipendenze JavaScript. Offre login,
+visualizzazione dispensa, ricerca nel catalogo, aggiunta manuale e scansione barcode
+multipla. FastAPI serve i file statici e una piccola configurazione runtime; tutte le
 operazioni sui dati passano dagli endpoint `/api/v1` esistenti.
+
+Lo scanner usa `getUserMedia` e richiede HTTPS (eccetto `localhost`). Sfrutta la Barcode
+Detection API nativa quando presente e usa la copia locale di ZXing Browser 0.2.1 (licenza
+MIT in `frontend/vendor/ZXING-LICENSE.txt`) come fallback sugli altri browser moderni. Se il
+permesso è negato, la fotocamera non è disponibile o il browser non è compatibile,
+l'interfaccia mostra un messaggio dedicato e lascia disponibile la ricerca manuale. Le
+scansioni restano nel frontend fino alla conferma: i prodotti nuovi usano
+`POST /api/v1/inventory`, mentre quelli già presenti vengono incrementati con
+`PATCH /api/v1/inventory/{id}`.

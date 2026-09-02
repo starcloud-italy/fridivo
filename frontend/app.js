@@ -14,7 +14,13 @@ const elements = {
   searchLoading: $("#search-loading"), searchEmpty: $("#search-empty"), searchError: $("#search-error"), searchWelcome: $("#search-welcome"),
   backdrop: $("#sheet-backdrop"), sheet: $("#add-sheet"), selectedProduct: $("#selected-product"),
   addForm: $("#add-form"), addError: $("#add-error"), confirmAdd: $("#confirm-add"),
-  quantityValue: $("#quantity-value"), expiryDate: $("#expiry-date"), toast: $("#toast")
+  quantityValue: $("#quantity-value"), expiryDate: $("#expiry-date"), toast: $("#toast"),
+  scannerModal: $("#scanner-modal"), scannerLive: $("#scanner-live"), scannerSummary: $("#scanner-summary"),
+  scannerVideo: $("#scanner-video"), cameraLoading: $("#camera-loading"), cameraError: $("#camera-error"),
+  cameraErrorMessage: $("#camera-error-message"), scanFeedback: $("#scan-feedback"), scanRecent: $("#scan-recent"),
+  scanTotal: $("#scan-total"), summaryList: $("#summary-list"), summaryEmpty: $("#summary-empty"),
+  summaryOptions: $("#summary-options"), scanExpiryDate: $("#scan-expiry-date"),
+  scannerSaveError: $("#scanner-save-error"), confirmScanned: $("#confirm-scanned")
 };
 
 let token = sessionStorage.getItem(TOKEN_KEY);
@@ -22,6 +28,20 @@ let selectedProduct = null;
 let quantity = 1;
 let toastTimer;
 let lastFocusedElement;
+let scannerStream = null;
+let scannerFrame = null;
+let scannerDetector = null;
+let zxingControls = null;
+let cameraStartId = 0;
+let scannerActive = false;
+let detectionPending = false;
+let feedbackTimer;
+const scanSession = new Map();
+const scanCooldowns = new Map();
+const scanLookups = new Set();
+const unknownScans = [];
+const BARCODE_COOLDOWN_MS = 1100;
+const BARCODE_FORMATS = ["ean_13", "ean_8", "upc_a", "upc_e"];
 
 class ApiError extends Error {
   constructor(status, detail) { super(detail); this.status = status; }
@@ -71,6 +91,7 @@ function showLogin(message = "") {
   elements.authenticated.hidden = true;
   elements.login.hidden = false;
   closeSheet();
+  closeScanner();
   setMessage(elements.loginError, message);
 }
 
@@ -235,6 +256,286 @@ function showToast(message) {
   toastTimer = setTimeout(() => { elements.toast.hidden = true; }, 3200);
 }
 
+function scannedUnitCount() {
+  return [...scanSession.values()].reduce((total, item) => total + item.quantity, 0);
+}
+
+function setScanFeedback(message, type = "", reset = true) {
+  clearTimeout(feedbackTimer);
+  elements.scanFeedback.className = `scan-feedback ${type}`.trim();
+  elements.scanFeedback.querySelector("span:last-child").textContent = message;
+  if (reset && scannerActive) {
+    feedbackTimer = setTimeout(() => setScanFeedback("Inquadra il prossimo barcode", "", false), 1600);
+  }
+}
+
+function renderScanSession() {
+  const items = [...scanSession.values()].sort((a, b) => b.lastScannedAt - a.lastScannedAt);
+  const total = scannedUnitCount();
+  elements.scanTotal.textContent = `${total} unità`;
+  const knownRows = items.slice(0, 4).map(({ product, quantity: itemQuantity }) => `
+    <div class="scan-recent-item">
+      ${productImage(product)}
+      <div><p class="product-name">${escapeHtml(product.name || "Prodotto")}</p>${product.brands ? `<p class="product-brand">${escapeHtml(product.brands)}</p>` : ""}</div>
+      <span class="scan-quantity">×${itemQuantity}</span>
+    </div>`);
+  const unknownRows = unknownScans.slice(0, Math.max(0, 4 - knownRows.length)).map(({ barcode }) => `
+    <div class="scan-recent-item">
+      <div class="product-image image-fallback" aria-hidden="true">?</div>
+      <div><p class="product-name">Prodotto non riconosciuto</p><p class="product-brand">${escapeHtml(barcode)}</p></div>
+    </div>`);
+  elements.scanRecent.innerHTML = knownRows.length || unknownRows.length
+    ? [...knownRows, ...unknownRows].join("")
+    : '<p class="scan-empty">I prodotti riconosciuti appariranno qui.</p>';
+}
+
+function cameraErrorMessage(error) {
+  if (!window.isSecureContext) return "La fotocamera richiede una connessione HTTPS sicura.";
+  if (!("BarcodeDetector" in window) && !window.ZXingBrowser?.BrowserMultiFormatReader) return "Questo browser non supporta la scansione barcode. Puoi continuare con la ricerca manuale.";
+  if (!navigator.mediaDevices?.getUserMedia) return "Questo browser non consente l’accesso alla fotocamera.";
+  if (error?.name === "NotAllowedError" || error?.name === "SecurityError") return "Il permesso fotocamera è stato negato. Abilitalo nelle impostazioni del browser o usa la ricerca manuale.";
+  if (error?.name === "NotFoundError" || error?.name === "DevicesNotFoundError") return "Non è stata trovata una fotocamera utilizzabile.";
+  if (error?.name === "NotReadableError" || error?.name === "TrackStartError") return "La fotocamera è già in uso o non può essere avviata.";
+  return "Non è stato possibile avviare la scansione. Puoi usare la ricerca manuale.";
+}
+
+function showCameraError(error) {
+  stopCamera();
+  elements.cameraLoading.hidden = true;
+  elements.cameraErrorMessage.textContent = cameraErrorMessage(error);
+  elements.cameraError.hidden = false;
+  setScanFeedback("Scansione non disponibile", "warning", false);
+}
+
+async function createBarcodeDetector() {
+  if (!("BarcodeDetector" in window)) throw new DOMException("Barcode detector unsupported", "NotSupportedError");
+  if (typeof window.BarcodeDetector.getSupportedFormats !== "function") return new window.BarcodeDetector({ formats: BARCODE_FORMATS });
+  const supported = await window.BarcodeDetector.getSupportedFormats();
+  const formats = BARCODE_FORMATS.filter((format) => supported.includes(format));
+  if (!formats.length) throw new DOMException("Barcode formats unsupported", "NotSupportedError");
+  return new window.BarcodeDetector({ formats });
+}
+
+function stopCamera() {
+  cameraStartId += 1;
+  scannerActive = false;
+  detectionPending = false;
+  if (scannerFrame !== null) cancelAnimationFrame(scannerFrame);
+  scannerFrame = null;
+  scannerDetector = null;
+  if (zxingControls) zxingControls.stop();
+  zxingControls = null;
+  if (scannerStream) scannerStream.getTracks().forEach((track) => track.stop());
+  scannerStream = null;
+  elements.scannerVideo.pause();
+  elements.scannerVideo.srcObject = null;
+}
+
+async function lookupScannedBarcode(barcode) {
+  if (scanLookups.has(barcode)) return;
+  scanLookups.add(barcode);
+  try {
+    const product = await api(`/api/v1/products/barcode/${encodeURIComponent(barcode)}`);
+    const previous = scanSession.get(barcode);
+    scanSession.set(barcode, {
+      product,
+      quantity: (previous?.quantity || 0) + 1,
+      lastScannedAt: Date.now()
+    });
+    if (navigator.vibrate) navigator.vibrate(70);
+    renderScanSession();
+    setScanFeedback(`${product.name || "Prodotto"} · ×${scanSession.get(barcode).quantity}`, "success");
+  } catch (error) {
+    if (error.status === 404) {
+      unknownScans.unshift({ barcode, scannedAt: Date.now() });
+      renderScanSession();
+      setScanFeedback("Prodotto non riconosciuto", "warning");
+    } else if (error.status !== 401) {
+      setScanFeedback("Errore di lookup. Continua con il prossimo prodotto.", "warning");
+    }
+  } finally {
+    scanLookups.delete(barcode);
+  }
+}
+
+function acceptDetectedBarcode(rawValue) {
+  const barcode = String(rawValue || "").trim();
+  if (!/^\d{8,14}$/.test(barcode)) return false;
+  const now = Date.now();
+  if (now - (scanCooldowns.get(barcode) || 0) < BARCODE_COOLDOWN_MS || scanLookups.has(barcode)) return false;
+  scanCooldowns.set(barcode, now);
+  lookupScannedBarcode(barcode);
+  return true;
+}
+
+async function detectBarcodeFrame() {
+  if (!scannerActive) return;
+  if (!detectionPending && elements.scannerVideo.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+    detectionPending = true;
+    try {
+      const results = await scannerDetector.detect(elements.scannerVideo);
+      for (const result of results) acceptDetectedBarcode(result.rawValue);
+    } catch (error) {
+      if (error.name !== "InvalidStateError") showCameraError(error);
+    } finally {
+      detectionPending = false;
+    }
+  }
+  if (scannerActive) scannerFrame = requestAnimationFrame(detectBarcodeFrame);
+}
+
+async function startCamera() {
+  stopCamera();
+  const startId = cameraStartId;
+  elements.cameraError.hidden = true;
+  elements.cameraLoading.hidden = false;
+  setScanFeedback("Avvio fotocamera…", "", false);
+  try {
+    const constraints = {
+      video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } },
+      audio: false
+    };
+    if ("BarcodeDetector" in window) {
+      try {
+        scannerDetector = await createBarcodeDetector();
+      } catch (error) {
+        if (error.name !== "NotSupportedError" || !window.ZXingBrowser?.BrowserMultiFormatReader) throw error;
+      }
+    }
+    if (scannerDetector) {
+      const streamPromise = navigator.mediaDevices.getUserMedia(constraints);
+      streamPromise.then((stream) => {
+        if (startId !== cameraStartId) stream.getTracks().forEach((track) => track.stop());
+      }).catch(() => {});
+      scannerStream = await streamPromise;
+      if (startId !== cameraStartId) {
+        scannerStream.getTracks().forEach((track) => track.stop());
+        scannerStream = null;
+        return;
+      }
+      elements.scannerVideo.srcObject = scannerStream;
+      await elements.scannerVideo.play();
+    } else if (window.ZXingBrowser?.BrowserMultiFormatReader) {
+      const codeReader = new window.ZXingBrowser.BrowserMultiFormatReader(undefined, {
+        delayBetweenScanAttempts: 250,
+        delayBetweenScanSuccess: 250
+      });
+      const controlsPromise = codeReader.decodeFromConstraints(constraints, elements.scannerVideo, (result) => {
+        if (result) acceptDetectedBarcode(result.getText());
+      });
+      controlsPromise.then((controls) => {
+        if (startId !== cameraStartId) controls.stop();
+      }).catch(() => {});
+      const controls = await controlsPromise;
+      if (startId !== cameraStartId) {
+        controls.stop();
+        return;
+      }
+      zxingControls = controls;
+    } else {
+      throw new DOMException("Barcode detector unsupported", "NotSupportedError");
+    }
+    elements.cameraLoading.hidden = true;
+    scannerActive = true;
+    setScanFeedback("Inquadra un barcode", "", false);
+    if (scannerDetector) scannerFrame = requestAnimationFrame(detectBarcodeFrame);
+  } catch (error) {
+    showCameraError(error);
+  }
+}
+
+function openScanner() {
+  scanSession.clear();
+  scanCooldowns.clear();
+  scanLookups.clear();
+  unknownScans.length = 0;
+  elements.scanExpiryDate.value = "";
+  $("input[name='scan-location'][value='fridge']").checked = true;
+  setMessage(elements.scannerSaveError);
+  renderScanSession();
+  elements.scannerLive.hidden = false;
+  elements.scannerSummary.hidden = true;
+  elements.scannerModal.hidden = false;
+  elements.authenticated.inert = true;
+  document.body.classList.add("scanner-open");
+  lastFocusedElement = document.activeElement;
+  startCamera();
+}
+
+function closeScanner() {
+  if (elements.scannerModal.hidden) return;
+  stopCamera();
+  clearTimeout(feedbackTimer);
+  elements.scannerModal.hidden = true;
+  elements.authenticated.inert = false;
+  document.body.classList.remove("scanner-open");
+  lastFocusedElement?.focus();
+}
+
+function renderScannerSummary() {
+  const items = [...scanSession.values()];
+  elements.summaryEmpty.hidden = items.length !== 0;
+  elements.summaryOptions.hidden = items.length === 0;
+  elements.confirmScanned.disabled = items.length === 0;
+  elements.summaryList.innerHTML = items.map(({ product, quantity: itemQuantity }) => `
+    <article class="summary-item" data-barcode="${escapeHtml(product.barcode)}">
+      ${productImage(product)}
+      <div><h3 class="product-name">${escapeHtml(product.name || "Prodotto")}</h3>${product.brands ? `<p class="product-brand">${escapeHtml(product.brands)}</p>` : ""}</div>
+      <div class="summary-controls" aria-label="Quantità di ${escapeHtml(product.name || "prodotto")}">
+        <button type="button" data-summary-action="decrease" aria-label="Diminuisci quantità">−</button>
+        <output aria-live="polite">${itemQuantity}</output>
+        <button type="button" data-summary-action="increase" aria-label="Aumenta quantità">+</button>
+      </div>
+      <button class="remove-summary-item" type="button" data-summary-action="remove">Rimuovi</button>
+    </article>`).join("");
+}
+
+function finishScanning() {
+  stopCamera();
+  setMessage(elements.scannerSaveError);
+  elements.scannerLive.hidden = true;
+  elements.scannerSummary.hidden = false;
+  renderScannerSummary();
+  elements.scannerModal.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function resumeScanning() {
+  setMessage(elements.scannerSaveError);
+  elements.scannerSummary.hidden = true;
+  elements.scannerLive.hidden = false;
+  renderScanSession();
+  startCamera();
+}
+
+async function updateExistingInventoryItem(existing, scannedItem, storageLocation, expiryDate) {
+  const payload = { quantity: existing.quantity + scannedItem.quantity, storage_location: storageLocation };
+  if (expiryDate) payload.expiry_date = expiryDate;
+  return api(`/api/v1/inventory/${existing.id}`, { method: "PATCH", body: JSON.stringify(payload) });
+}
+
+async function saveScannedItem(scannedItem, inventoryByBarcode, storageLocation, expiryDate) {
+  const barcode = scannedItem.product.barcode;
+  const existing = inventoryByBarcode.get(barcode);
+  if (existing) return updateExistingInventoryItem(existing, scannedItem, storageLocation, expiryDate);
+  try {
+    return await api("/api/v1/inventory", {
+      method: "POST",
+      body: JSON.stringify({
+        product_barcode: barcode,
+        quantity: scannedItem.quantity,
+        expiry_date: expiryDate || null,
+        storage_location: storageLocation
+      })
+    });
+  } catch (error) {
+    if (error.status !== 409) throw error;
+    const refreshed = await api("/api/v1/inventory");
+    const concurrentItem = refreshed.find((item) => item.product_barcode === barcode);
+    if (!concurrentItem) throw error;
+    return updateExistingInventoryItem(concurrentItem, scannedItem, storageLocation, expiryDate);
+  }
+}
+
 elements.loginForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   setMessage(elements.loginError);
@@ -264,6 +565,63 @@ $("#logout-button").addEventListener("click", () => { clearSession(); showLogin(
 $("#retry-inventory").addEventListener("click", loadInventory);
 $$('.add-product-trigger').forEach((button) => button.addEventListener("click", () => showView("search")));
 $$('.nav-item').forEach((button) => button.addEventListener("click", () => showView(button.dataset.view)));
+$("#open-scanner").addEventListener("click", openScanner);
+$("#close-scanner").addEventListener("click", closeScanner);
+$("#finish-scanning").addEventListener("click", finishScanning);
+$("#resume-scanning").addEventListener("click", resumeScanning);
+$("#scanner-manual-search").addEventListener("click", () => {
+  closeScanner();
+  setTimeout(() => elements.searchInput.focus(), 50);
+});
+
+elements.summaryList.addEventListener("click", (event) => {
+  const actionButton = event.target.closest("[data-summary-action]");
+  const row = actionButton?.closest("[data-barcode]");
+  if (!actionButton || !row) return;
+  const item = scanSession.get(row.dataset.barcode);
+  if (!item) return;
+  const action = actionButton.dataset.summaryAction;
+  if (action === "remove") scanSession.delete(row.dataset.barcode);
+  if (action === "increase") item.quantity += 1;
+  if (action === "decrease") item.quantity = Math.max(1, item.quantity - 1);
+  renderScannerSummary();
+});
+
+elements.confirmScanned.addEventListener("click", async () => {
+  const items = [...scanSession.entries()];
+  if (!items.length) return;
+  setMessage(elements.scannerSaveError);
+  setLoading(elements.confirmScanned, true);
+  const storageLocation = $("input[name='scan-location']:checked").value;
+  const expiryDate = elements.scanExpiryDate.value || null;
+  const failures = [];
+  try {
+    const inventory = await api("/api/v1/inventory");
+    const inventoryByBarcode = new Map(inventory.map((item) => [item.product_barcode, item]));
+    for (const [barcode, scannedItem] of items) {
+      try {
+        const saved = await saveScannedItem(scannedItem, inventoryByBarcode, storageLocation, expiryDate);
+        inventoryByBarcode.set(barcode, saved);
+        scanSession.delete(barcode);
+      } catch (error) {
+        if (error.status === 401) throw error;
+        failures.push(scannedItem.product.name || barcode);
+      }
+    }
+    if (!failures.length) {
+      closeScanner();
+      showView("inventory");
+      showToast(`${items.length} ${items.length === 1 ? "prodotto aggiunto" : "prodotti aggiunti"} alla dispensa`);
+    } else {
+      renderScannerSummary();
+      setMessage(elements.scannerSaveError, `Non è stato possibile aggiungere: ${failures.join(", ")}. Gli altri prodotti sono stati salvati.`);
+    }
+  } catch (error) {
+    if (error.status !== 401) setMessage(elements.scannerSaveError, userMessage(error, "add"));
+  } finally {
+    setLoading(elements.confirmScanned, false);
+  }
+});
 
 elements.searchInput.addEventListener("input", () => { elements.clearSearch.hidden = !elements.searchInput.value; });
 elements.clearSearch.addEventListener("click", () => {
@@ -284,7 +642,10 @@ elements.searchForm.addEventListener("submit", (event) => {
 
 $("#close-sheet").addEventListener("click", closeSheet);
 elements.backdrop.addEventListener("click", closeSheet);
-document.addEventListener("keydown", (event) => { if (event.key === "Escape") closeSheet(); });
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape") return;
+  if (!elements.scannerModal.hidden) closeScanner(); else closeSheet();
+});
 $("#quantity-minus").addEventListener("click", () => { quantity = Math.max(1, quantity - 1); elements.quantityValue.textContent = quantity; });
 $("#quantity-plus").addEventListener("click", () => { quantity += 1; elements.quantityValue.textContent = quantity; });
 

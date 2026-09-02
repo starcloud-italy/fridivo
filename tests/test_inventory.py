@@ -219,6 +219,28 @@ def test_duplicate_product_does_not_create_multiple_lots(client, registration_pa
     assert len(client.get("/api/v1/inventory", headers=headers).json()) == 1
 
 
+def test_scanner_style_addition_increments_an_existing_inventory_item(client, registration_payload):
+    user = register(client, registration_payload)
+    headers = auth(user)
+    existing = create_item(client, headers, quantity=2)
+
+    scanned_quantity = 3
+    response = client.patch(
+        f"/api/v1/inventory/{existing['id']}",
+        json={
+            "quantity": existing["quantity"] + scanned_quantity,
+            "storage_location": "pantry",
+        },
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["quantity"] == 5
+    items = client.get("/api/v1/inventory", headers=headers).json()
+    assert len(items) == 1
+    assert items[0]["product_barcode"] == existing["product_barcode"]
+
+
 def test_inventory_is_isolated_between_households(client, registration_payload):
     owner = register(client, registration_payload, email="owner@example.com")
     stranger = register(client, registration_payload, email="stranger@example.com")
@@ -234,4 +256,3 @@ def test_inventory_is_isolated_between_households(client, registration_payload):
     assert patch.status_code == 404
     assert delete.status_code == 404
     assert client.get("/api/v1/inventory", headers=auth(owner)).json()[0]["quantity"] == 2
-
