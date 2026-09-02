@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#3f6b57" />
+    <meta name="description" content="Fridivo: la tua dispensa, sempre con te." />
+    <title>Fridivo</title>
+    <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/assets/styles.css" />
+    <script src="/app-config.js"></script>
+    <script type="module" src="/assets/app.js"></script>
+  </head>
+  <body>
+    <div id="app" class="app-shell">
+      <section id="boot-screen" class="center-screen" aria-label="Caricamento">
+        <div class="brand-mark" aria-hidden="true">F</div>
+        <p class="muted">Prepariamo la tua dispensa…</p>
+      </section>
+
+      <main id="login-screen" class="login-screen" hidden>
+        <div class="login-card">
+          <div class="brand-lockup">
+            <div class="brand-mark" aria-hidden="true">F</div>
+            <span>Fridivo</span>
+          </div>
+          <div class="login-copy">
+            <p class="eyebrow">Bentornato</p>
+            <h1>La tua dispensa,<br />sempre con te.</h1>
+            <p>Accedi per vedere subito cosa hai già a casa.</p>
+          </div>
+
+          <form id="login-form" novalidate>
+            <div class="field">
+              <label for="email">Email</label>
+              <input id="email" name="email" type="email" inputmode="email" autocomplete="email" placeholder="nome@esempio.it" required />
+            </div>
+            <div class="field">
+              <label for="password">Password</label>
+              <div class="password-field">
+                <input id="password" name="password" type="password" autocomplete="current-password" placeholder="La tua password" required />
+                <button id="toggle-password" class="icon-button password-toggle" type="button" aria-label="Mostra password">
+                  <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"/><circle cx="12" cy="12" r="2.5"/></svg>
+                </button>
+              </div>
+            </div>
+            <div id="login-error" class="inline-message error" role="alert" hidden></div>
+            <button id="login-button" class="primary-button full-width" type="submit">
+              <span>Accedi</span>
+              <span class="button-spinner" aria-hidden="true"></span>
+            </button>
+          </form>
+        </div>
+      </main>
+
+      <div id="authenticated-app" hidden>
+        <header class="topbar">
+          <div>
+            <div class="wordmark"><span class="wordmark-dot">F</span> Fridivo</div>
+            <p id="page-kicker" class="page-kicker">La tua casa</p>
+          </div>
+          <button id="logout-button" class="icon-button" type="button" aria-label="Esci">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M10 17l5-5-5-5M15 12H3M14 3h5a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-5"/></svg>
+          </button>
+        </header>
+
+        <main class="main-content">
+          <section id="inventory-view" class="view" aria-labelledby="inventory-title">
+            <div class="page-heading">
+              <div>
+                <p class="eyebrow">A colpo d’occhio</p>
+                <h1 id="inventory-title">La tua dispensa</h1>
+              </div>
+              <span id="inventory-count" class="count-badge" hidden></span>
+            </div>
+
+            <div id="inventory-loading" class="card-list" aria-label="Caricamento dispensa" hidden>
+              <div class="product-card skeleton-card"></div>
+              <div class="product-card skeleton-card"></div>
+              <div class="product-card skeleton-card"></div>
+            </div>
+
+            <div id="inventory-error" class="state-card" hidden>
+              <div class="state-icon error-icon" aria-hidden="true">!</div>
+              <h2>Non riusciamo a caricare la dispensa</h2>
+              <p>Controlla la connessione e riprova tra poco.</p>
+              <button id="retry-inventory" class="secondary-button" type="button">Riprova</button>
+            </div>
+
+            <div id="inventory-empty" class="state-card empty-state" hidden>
+              <div class="pantry-illustration" aria-hidden="true">
+                <span class="jar jar-one"></span><span class="jar jar-two"></span><span class="jar jar-three"></span>
+                <span class="shelf"></span>
+              </div>
+              <h2>La tua dispensa è pronta</h2>
+              <p>Aggiungi il primo prodotto per averlo sempre sotto controllo.</p>
+              <button class="primary-button add-product-trigger" type="button">Aggiungi prodotto</button>
+            </div>
+
+            <div id="inventory-list" class="card-list" aria-live="polite"></div>
+          </section>
+
+          <section id="search-view" class="view" aria-labelledby="search-title" hidden>
+            <div class="page-heading compact-heading">
+              <div>
+                <p class="eyebrow">Aggiungi</p>
+                <h1 id="search-title">Cerca un prodotto</h1>
+              </div>
+            </div>
+            <form id="search-form" class="search-form" role="search">
+              <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+              <input id="search-input" name="q" type="search" enterkeyhint="search" autocomplete="off" placeholder="Es. yogurt, pasta, latte…" aria-label="Cerca nel catalogo" />
+              <button id="clear-search" class="clear-button" type="button" aria-label="Cancella ricerca" hidden>×</button>
+              <button class="search-button" type="submit">Cerca</button>
+            </form>
+            <p class="search-hint">Scrivi almeno 2 caratteri</p>
+
+            <div id="search-loading" class="card-list" aria-label="Ricerca in corso" hidden>
+              <div class="product-card skeleton-card"></div>
+              <div class="product-card skeleton-card"></div>
+            </div>
+            <div id="search-error" class="state-card small-state" hidden>
+              <div class="state-icon error-icon" aria-hidden="true">!</div>
+              <h2>Ricerca non disponibile</h2>
+              <p>Riprova tra qualche istante.</p>
+            </div>
+            <div id="search-empty" class="state-card small-state" hidden>
+              <div class="state-icon" aria-hidden="true">?</div>
+              <h2>Nessun prodotto trovato</h2>
+              <p>Prova con un nome più semplice o controlla l’ortografia.</p>
+            </div>
+            <div id="search-welcome" class="search-welcome">
+              <div class="search-orbit" aria-hidden="true">⌕</div>
+              <h2>Cosa vuoi aggiungere?</h2>
+              <p>Cerca il prodotto per nome e selezionalo dall’elenco.</p>
+            </div>
+            <div id="search-results" class="card-list search-results" aria-live="polite"></div>
+          </section>
+        </main>
+
+        <button id="fab-add" class="fab add-product-trigger" type="button" aria-label="Aggiungi prodotto">
+          <span aria-hidden="true">+</span><span>Aggiungi prodotto</span>
+        </button>
+
+        <nav class="bottom-nav" aria-label="Navigazione principale">
+          <button class="nav-item active" type="button" data-view="inventory" aria-current="page">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 10h16v10H4zM7 4h10l3 6H4l3-6Z"/><path d="M9 14h6"/></svg>
+            <span>Dispensa</span>
+          </button>
+          <button class="nav-item" type="button" data-view="search">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+            <span>Aggiungi</span>
+          </button>
+        </nav>
+      </div>
+    </div>
+
+    <div id="sheet-backdrop" class="sheet-backdrop" hidden></div>
+    <section id="add-sheet" class="bottom-sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" hidden>
+      <div class="sheet-handle" aria-hidden="true"></div>
+      <div class="sheet-header">
+        <h2 id="sheet-title">Aggiungi alla dispensa</h2>
+        <button id="close-sheet" class="icon-button" type="button" aria-label="Chiudi">×</button>
+      </div>
+      <form id="add-form">
+        <div id="selected-product" class="selected-product"></div>
+        <div class="form-row">
+          <div class="field quantity-field">
+            <label>Quantità</label>
+            <div class="stepper" aria-label="Quantità">
+              <button id="quantity-minus" type="button" aria-label="Diminuisci quantità">−</button>
+              <output id="quantity-value" aria-live="polite">1</output>
+              <button id="quantity-plus" type="button" aria-label="Aumenta quantità">+</button>
+            </div>
+          </div>
+          <div class="field date-field">
+            <label for="expiry-date">Scadenza <span>opzionale</span></label>
+            <input id="expiry-date" type="date" />
+          </div>
+        </div>
+        <fieldset class="location-fieldset">
+          <legend>Posizione</legend>
+          <div class="location-grid">
+            <label><input type="radio" name="location" value="fridge" checked /><span>❄️ Frigorifero</span></label>
+            <label><input type="radio" name="location" value="freezer" /><span>🧊 Congelatore</span></label>
+            <label><input type="radio" name="location" value="pantry" /><span>🥫 Dispensa</span></label>
+            <label><input type="radio" name="location" value="other" /><span>📍 Altro</span></label>
+          </div>
+        </fieldset>
+        <div id="add-error" class="inline-message error" role="alert" hidden></div>
+        <button id="confirm-add" class="primary-button full-width" type="submit">
+          <span>Aggiungi alla dispensa</span><span class="button-spinner" aria-hidden="true"></span>
+        </button>
+      </form>
+    </section>
+
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  </body>
+</html>

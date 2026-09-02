@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = Field(
         default=30, gt=0, validation_alias="ACCESS_TOKEN_EXPIRE_MINUTES"
     )
+    frontend_api_base_url: str = Field(default="", validation_alias="FRONTEND_API_BASE_URL")
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
@@ -21,4 +22,3 @@ def get_settings() -> Settings:
 
 
 settings = get_settings()
-

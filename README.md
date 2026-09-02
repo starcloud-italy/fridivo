@@ -13,6 +13,13 @@ Backend FastAPI modulare per autenticazione, household e catalogo prodotti local
 
 3. OpenAPI è disponibile su `http://localhost:8000/docs`.
 
+L'interfaccia web mobile-first è disponibile su `http://localhost:8000/`. Per impostazione
+predefinita usa le API sullo stesso host. Se il frontend viene pubblicato dietro un host
+API differente, configurare `FRONTEND_API_BASE_URL` (senza slash finale).
+
+La sessione dell'interfaccia viene conservata in `sessionStorage`: il token non viene
+inserito nel codice, nei log o in storage persistente.
+
 ## Test isolati
 
 La suite ignora `DATABASE_URL` e accetta esclusivamente `TEST_DATABASE_URL` con un nome database che termina in `_test`. Il servizio Docker usa inoltre un database PostgreSQL distinto, su `tmpfs`:
@@ -56,3 +63,10 @@ Gli endpoint inventory sono protetti da JWT e operano sempre sull'household dell
 - `DELETE /api/v1/inventory/{id}`.
 
 Ogni prodotto può comparire una sola volta per household. Il catalogo viene consultato in sola lettura per validare il barcode e arricchire le risposte con nome, brand, formato e immagine.
+
+## Interfaccia V1
+
+Il frontend statico non richiede una build Node o dipendenze JavaScript. Offre soltanto il
+ciclo iniziale richiesto: login, visualizzazione dispensa, ricerca nel catalogo e aggiunta
+di un prodotto. FastAPI serve i file statici e una piccola configurazione runtime; tutte le
+operazioni sui dati passano dagli endpoint `/api/v1` esistenti.
