@@ -12,6 +12,7 @@ def test_frontend_assets_and_runtime_config_are_available(client):
     stylesheet = client.get("/assets/styles.css")
     script = client.get("/assets/app.js")
     scanner_state = client.get("/assets/scanner-state.mjs")
+    i18n = client.get("/assets/i18n.mjs")
     zxing = client.get("/assets/vendor/zxing-browser-0.2.1.min.js")
     zxing_license = client.get("/assets/vendor/ZXING-LICENSE.txt")
     config = client.get("/app-config.js")
@@ -20,6 +21,8 @@ def test_frontend_assets_and_runtime_config_are_available(client):
     assert "#3f6b57" in stylesheet.text.lower()
     assert script.status_code == 200
     assert scanner_state.status_code == 200
+    assert i18n.status_code == 200
+    assert "TRANSLATIONS" in i18n.text
     assert "class BarcodePresenceTracker" in scanner_state.text
     assert '"/api/v1/auth/login"' in script.text
     assert '"/api/v1/inventory"' in script.text
@@ -141,7 +144,9 @@ def test_scanner_summary_is_editable_and_only_saves_after_confirmation(client):
         assert f'value: "{location}"' in script
     assert "setSessionItemLocation(scanSession" in script
     assert "elements.confirmScanned.disabled = !sessionIsReadyToSave(scanSession)" in script
-    assert 'id="scan-expiry-date"' in html
+    assert 'data-summary-expiry' in script
+    assert 'id="scan-expiry-date"' not in html
+    assert "setSessionItemExpiry(scanSession" in script
     assert 'method: "POST"' in script
     assert 'method: "PATCH"' in script
     assert "existing.quantity + scannedItem.quantity" in script
@@ -197,7 +202,7 @@ def test_inventory_manual_removal_requires_confirmation_and_updates_ui(client):
     assert 'id="confirm-remove-inventory-item"' in html
     assert 'method: "DELETE"' in script
     assert "inventoryItems = inventoryItems.filter" in script
-    assert "Prodotto rimosso dalla dispensa" in script
+    assert 't("success.inventoryRemoved")' in script
 
 
 def test_inventory_management_reuses_mobile_scanner_location_controls(client):
@@ -210,3 +215,94 @@ def test_inventory_management_reuses_mobile_scanner_location_controls(client):
     assert 'renderSummaryLocationButtons(inventoryEditLocation, "inventory-location")' in script
     assert ".summary-location-button" in stylesheet
     assert "min-height: 52px" in stylesheet
+
+
+def test_frontend_supports_italian_and_english_with_browser_detection(client):
+    html = client.get("/").text
+    script = client.get("/assets/app.js").text
+    i18n = client.get("/assets/i18n.mjs").text
+
+    assert 'html lang="it"' in html
+    assert 'it: {' in i18n
+    assert 'en: {' in i18n
+    assert 'startsWith("it") ? "it" : "en"' in i18n
+    assert "navigator.languages" in script
+    assert 'document.documentElement.lang = currentLanguage' in script
+
+
+def test_language_switch_is_manual_persistent_and_does_not_reload(client):
+    html = client.get("/").text
+    script = client.get("/assets/app.js").text
+
+    assert html.count('data-language="it"') == 2
+    assert html.count('data-language="en"') == 2
+    assert 'localStorage.getItem(LANGUAGE_KEY)' in script
+    assert 'localStorage.setItem(LANGUAGE_KEY, language)' in script
+    assert "applyStaticTranslations()" in script
+    assert "refreshLocalizedView()" in script
+    assert "window.location.reload" not in script
+
+
+def test_static_dynamic_scanner_and_inventory_texts_are_localized(client):
+    html = client.get("/").text
+    script = client.get("/assets/app.js").text
+    i18n = client.get("/assets/i18n.mjs").text
+
+    for marker in (
+        'data-i18n="login.welcome"',
+        'data-i18n="inventory.manageTitle"',
+        'data-i18n="scanner.title"',
+        'data-i18n="scanner.summaryIntro"',
+        'data-i18n-aria-label="scanner.videoLabel"',
+        'data-i18n-placeholder="search.placeholder"',
+    ):
+        assert marker in html
+    for key in (
+        "location.fridge",
+        "location.freezer",
+        "location.pantry",
+        "location.other",
+        "camera.denied",
+        "error.sessionExpired",
+        "success.inventoryUpdated",
+        "inventory.removeConfirm",
+    ):
+        assert f'"{key}"' in i18n
+    assert 'new Intl.DateTimeFormat(locale()' in script
+    assert 't("validation.locations")' in script
+
+
+def test_consumption_and_history_ui_use_existing_i18n_and_api(client):
+    html = client.get("/").text
+    script = client.get("/assets/app.js").text
+    i18n = client.get("/assets/i18n.mjs").text
+
+    assert 'data-view="history"' in html
+    assert 'id="history-view"' in html
+    assert 'data-consumption-type="CONSUMED"' in html
+    assert 'data-consumption-type="FINISHED"' in html
+    assert 'data-consumption-type="DISCARDED"' in html
+    assert 'api("/api/v1/consumption-events"' in script
+    assert 'api("/api/v1/consumption-events?limit=50&offset=0")' in script
+    assert 'method: "DELETE"' in script
+    for key in (
+        "consumption.consumed",
+        "consumption.finished",
+        "consumption.discarded",
+        "history.title",
+        "history.emptyTitle",
+        "summary.optionalExpiry",
+    ):
+        assert f'"{key}"' in i18n
+
+
+def test_scanner_uses_individual_optional_expiry_dates(client):
+    html = client.get("/").text
+    script = client.get("/assets/app.js").text
+
+    assert "Scadenza comune" not in html
+    assert "Shared expiry date" not in client.get("/assets/i18n.mjs").text
+    assert 'data-summary-expiry' in script
+    assert "scannedItem.expiryDate || null" in script
+    assert "if (scannedItem.expiryDate) payload.expiry_date = scannedItem.expiryDate" in script
+    assert "elements.confirmScanned.disabled = !sessionIsReadyToSave(scanSession)" in script

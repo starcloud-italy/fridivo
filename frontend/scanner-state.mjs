@@ -77,7 +77,8 @@ export function addSessionUnit(session, barcode, product, onIncrement = () => {}
     product,
     quantity: (previous?.quantity || 0) + 1,
     lastScannedAt: Date.now(),
-    storageLocation: previous?.storageLocation || null
+    storageLocation: previous?.storageLocation || null,
+    expiryDate: previous?.expiryDate || null
   };
   session.set(barcode, item);
   try {
@@ -92,6 +93,13 @@ export function setSessionItemLocation(session, barcode, storageLocation) {
   const item = session.get(barcode);
   if (!item || !SCANNER_STORAGE_LOCATIONS.includes(storageLocation)) return false;
   item.storageLocation = storageLocation;
+  return true;
+}
+
+export function setSessionItemExpiry(session, barcode, expiryDate) {
+  const item = session.get(barcode);
+  if (!item) return false;
+  item.expiryDate = expiryDate || null;
   return true;
 }
 

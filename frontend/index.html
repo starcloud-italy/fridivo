@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#3f6b57" />
-    <meta name="description" content="Fridivo: la tua dispensa, sempre con te." />
+    <meta name="description" content="Fridivo: la tua dispensa, sempre con te." data-i18n-content="meta.description" />
     <title>Fridivo</title>
     <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/assets/styles.css" />
@@ -14,40 +14,45 @@
   </head>
   <body>
     <div id="app" class="app-shell">
-      <section id="boot-screen" class="center-screen" aria-label="Caricamento">
+      <section id="boot-screen" class="center-screen" aria-label="Caricamento" data-i18n-aria-label="inventory.loading">
         <div class="brand-mark" aria-hidden="true">F</div>
-        <p class="muted">Prepariamo la tua dispensa…</p>
+        <p class="muted" data-i18n="boot.loading">Prepariamo la tua dispensa…</p>
       </section>
 
       <main id="login-screen" class="login-screen" hidden>
         <div class="login-card">
-          <div class="brand-lockup">
-            <div class="brand-mark" aria-hidden="true">F</div>
-            <span>Fridivo</span>
+          <div class="login-toolbar">
+            <div class="brand-lockup">
+              <div class="brand-mark" aria-hidden="true">F</div>
+              <span>Fridivo</span>
+            </div>
+            <div class="language-switcher" role="group" aria-label="Cambia lingua" data-i18n-aria-label="language.selector">
+              <button type="button" data-language="it" aria-pressed="true">IT</button><span aria-hidden="true">|</span><button type="button" data-language="en" aria-pressed="false">EN</button>
+            </div>
           </div>
           <div class="login-copy">
-            <p class="eyebrow">Bentornato</p>
-            <h1>La tua dispensa,<br />sempre con te.</h1>
-            <p>Accedi per vedere subito cosa hai già a casa.</p>
+            <p class="eyebrow" data-i18n="login.welcome">Bentornato</p>
+            <h1 data-i18n-html="login.title">La tua dispensa,<br />sempre con te.</h1>
+            <p data-i18n="login.intro">Accedi per vedere subito cosa hai già a casa.</p>
           </div>
 
           <form id="login-form" novalidate>
             <div class="field">
-              <label for="email">Email</label>
-              <input id="email" name="email" type="email" inputmode="email" autocomplete="email" placeholder="nome@esempio.it" required />
+              <label for="email" data-i18n="login.email">Email</label>
+              <input id="email" name="email" type="email" inputmode="email" autocomplete="email" placeholder="nome@esempio.it" data-i18n-placeholder="login.emailPlaceholder" required />
             </div>
             <div class="field">
-              <label for="password">Password</label>
+              <label for="password" data-i18n="login.password">Password</label>
               <div class="password-field">
-                <input id="password" name="password" type="password" autocomplete="current-password" placeholder="La tua password" required />
-                <button id="toggle-password" class="icon-button password-toggle" type="button" aria-label="Mostra password">
+                <input id="password" name="password" type="password" autocomplete="current-password" placeholder="La tua password" data-i18n-placeholder="login.passwordPlaceholder" required />
+                <button id="toggle-password" class="icon-button password-toggle" type="button" aria-label="Mostra password" data-i18n-aria-label="login.showPassword">
                   <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"/><circle cx="12" cy="12" r="2.5"/></svg>
                 </button>
               </div>
             </div>
             <div id="login-error" class="inline-message error" role="alert" hidden></div>
             <button id="login-button" class="primary-button full-width" type="submit">
-              <span>Accedi</span>
+              <span data-i18n="login.submit">Accedi</span>
               <span class="button-spinner" aria-hidden="true"></span>
             </button>
           </form>
@@ -58,24 +63,29 @@
         <header class="topbar">
           <div>
             <div class="wordmark"><span class="wordmark-dot">F</span> Fridivo</div>
-            <p id="page-kicker" class="page-kicker">La tua casa</p>
+            <p id="page-kicker" class="page-kicker" data-i18n="app.home">La tua casa</p>
           </div>
-          <button id="logout-button" class="icon-button" type="button" aria-label="Esci">
-            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M10 17l5-5-5-5M15 12H3M14 3h5a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-5"/></svg>
-          </button>
+          <div class="topbar-actions">
+            <div class="language-switcher" role="group" aria-label="Cambia lingua" data-i18n-aria-label="language.selector">
+              <button type="button" data-language="it" aria-pressed="true">IT</button><span aria-hidden="true">|</span><button type="button" data-language="en" aria-pressed="false">EN</button>
+            </div>
+            <button id="logout-button" class="icon-button" type="button" aria-label="Esci" data-i18n-aria-label="auth.logout">
+              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M10 17l5-5-5-5M15 12H3M14 3h5a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-5"/></svg>
+            </button>
+          </div>
         </header>
 
         <main class="main-content">
           <section id="inventory-view" class="view" aria-labelledby="inventory-title">
             <div class="page-heading">
               <div>
-                <p class="eyebrow">A colpo d’occhio</p>
-                <h1 id="inventory-title">La tua dispensa</h1>
+                <p class="eyebrow" data-i18n="inventory.eyebrow">A colpo d’occhio</p>
+                <h1 id="inventory-title" data-i18n="inventory.title">La tua dispensa</h1>
               </div>
               <span id="inventory-count" class="count-badge" hidden></span>
             </div>
 
-            <div id="inventory-loading" class="card-list" aria-label="Caricamento dispensa" hidden>
+            <div id="inventory-loading" class="card-list" aria-label="Caricamento dispensa" data-i18n-aria-label="inventory.loading" hidden>
               <div class="product-card skeleton-card"></div>
               <div class="product-card skeleton-card"></div>
               <div class="product-card skeleton-card"></div>
@@ -83,9 +93,9 @@
 
             <div id="inventory-error" class="state-card" hidden>
               <div class="state-icon error-icon" aria-hidden="true">!</div>
-              <h2>Non riusciamo a caricare la dispensa</h2>
-              <p>Controlla la connessione e riprova tra poco.</p>
-              <button id="retry-inventory" class="secondary-button" type="button">Riprova</button>
+              <h2 data-i18n="inventory.loadErrorTitle">Non riusciamo a caricare la dispensa</h2>
+              <p data-i18n="inventory.loadErrorBody">Controlla la connessione e riprova tra poco.</p>
+              <button id="retry-inventory" class="secondary-button" type="button" data-i18n="common.retry">Riprova</button>
             </div>
 
             <div id="inventory-empty" class="state-card empty-state" hidden>
@@ -93,72 +103,101 @@
                 <span class="jar jar-one"></span><span class="jar jar-two"></span><span class="jar jar-three"></span>
                 <span class="shelf"></span>
               </div>
-              <h2>La tua dispensa è pronta</h2>
-              <p>Aggiungi il primo prodotto per averlo sempre sotto controllo.</p>
-              <button class="primary-button add-product-trigger" type="button">Aggiungi prodotto</button>
+              <h2 data-i18n="inventory.emptyTitle">La tua dispensa è pronta</h2>
+              <p data-i18n="inventory.emptyBody">Aggiungi il primo prodotto per averlo sempre sotto controllo.</p>
+              <button class="primary-button add-product-trigger" type="button" data-i18n="inventory.addProduct">Aggiungi prodotto</button>
             </div>
 
             <div id="inventory-list" class="card-list" aria-live="polite"></div>
           </section>
 
+          <section id="history-view" class="view" aria-labelledby="history-title" hidden>
+            <div class="page-heading">
+              <div>
+                <p class="eyebrow" data-i18n="history.eyebrow">Attività</p>
+                <h1 id="history-title" data-i18n="history.title">Storico</h1>
+              </div>
+            </div>
+            <div id="history-loading" class="card-list" aria-label="Caricamento storico" data-i18n-aria-label="history.loading" hidden>
+              <div class="product-card skeleton-card"></div>
+              <div class="product-card skeleton-card"></div>
+            </div>
+            <div id="history-error" class="state-card" hidden>
+              <div class="state-icon error-icon" aria-hidden="true">!</div>
+              <h2 data-i18n="history.errorTitle">Non riusciamo a caricare lo storico</h2>
+              <p data-i18n="history.errorBody">Riprova tra qualche istante.</p>
+              <button id="retry-history" class="secondary-button" type="button" data-i18n="common.retry">Riprova</button>
+            </div>
+            <div id="history-empty" class="state-card empty-state" hidden>
+              <div class="state-icon" aria-hidden="true">↺</div>
+              <h2 data-i18n="history.emptyTitle">Nessun evento registrato</h2>
+              <p data-i18n="history.emptyBody">I prodotti consumati, finiti o scartati appariranno qui.</p>
+            </div>
+            <div id="history-list" class="history-list" aria-live="polite"></div>
+          </section>
+
           <section id="search-view" class="view" aria-labelledby="search-title" hidden>
             <div class="page-heading compact-heading">
               <div>
-                <p class="eyebrow">Aggiungi</p>
-                <h1 id="search-title">Aggiungi prodotti</h1>
+                <p class="eyebrow" data-i18n="search.eyebrow">Aggiungi</p>
+                <h1 id="search-title" data-i18n="search.title">Aggiungi prodotti</h1>
               </div>
             </div>
             <button id="open-scanner" class="scanner-entry" type="button">
               <span class="scanner-entry-icon" aria-hidden="true">
                 <svg viewBox="0 0 24 24"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M8 9v6M11 9v6M14 9v6M17 9v6"/></svg>
               </span>
-              <span><strong>Scansiona barcode</strong><small>Fotocamera continua per più prodotti</small></span>
+              <span><strong data-i18n="scanner.open">Scansiona barcode</strong><small data-i18n="scanner.openHint">Fotocamera continua per più prodotti</small></span>
               <span class="select-cue" aria-hidden="true">›</span>
             </button>
-            <div class="manual-divider"><span>oppure cerca manualmente</span></div>
+            <div class="manual-divider"><span data-i18n="search.manualDivider">oppure cerca manualmente</span></div>
             <form id="search-form" class="search-form" role="search">
               <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
-              <input id="search-input" name="q" type="search" enterkeyhint="search" autocomplete="off" placeholder="Es. yogurt, pasta, latte…" aria-label="Cerca nel catalogo" />
-              <button id="clear-search" class="clear-button" type="button" aria-label="Cancella ricerca" hidden>×</button>
-              <button class="search-button" type="submit">Cerca</button>
+              <input id="search-input" name="q" type="search" enterkeyhint="search" autocomplete="off" placeholder="Es. yogurt, pasta, latte…" data-i18n-placeholder="search.placeholder" aria-label="Cerca nel catalogo" data-i18n-aria-label="search.catalogLabel" />
+              <button id="clear-search" class="clear-button" type="button" aria-label="Cancella ricerca" data-i18n-aria-label="search.clear" hidden>×</button>
+              <button class="search-button" type="submit" data-i18n="search.submit">Cerca</button>
             </form>
-            <p class="search-hint">Scrivi almeno 2 caratteri</p>
+            <p class="search-hint" data-i18n="search.hint">Scrivi almeno 2 caratteri</p>
 
-            <div id="search-loading" class="card-list" aria-label="Ricerca in corso" hidden>
+            <div id="search-loading" class="card-list" aria-label="Ricerca in corso" data-i18n-aria-label="search.loading" hidden>
               <div class="product-card skeleton-card"></div>
               <div class="product-card skeleton-card"></div>
             </div>
             <div id="search-error" class="state-card small-state" hidden>
               <div class="state-icon error-icon" aria-hidden="true">!</div>
-              <h2>Ricerca non disponibile</h2>
-              <p>Riprova tra qualche istante.</p>
+              <h2 data-i18n="search.errorTitle">Ricerca non disponibile</h2>
+              <p data-i18n="search.errorBody">Riprova tra qualche istante.</p>
             </div>
             <div id="search-empty" class="state-card small-state" hidden>
               <div class="state-icon" aria-hidden="true">?</div>
-              <h2>Nessun prodotto trovato</h2>
-              <p>Prova con un nome più semplice o controlla l’ortografia.</p>
+              <h2 data-i18n="search.emptyTitle">Nessun prodotto trovato</h2>
+              <p data-i18n="search.emptyBody">Prova con un nome più semplice o controlla l’ortografia.</p>
             </div>
             <div id="search-welcome" class="search-welcome">
               <div class="search-orbit" aria-hidden="true">⌕</div>
-              <h2>Cosa vuoi aggiungere?</h2>
-              <p>Cerca il prodotto per nome e selezionalo dall’elenco.</p>
+              <h2 data-i18n="search.welcomeTitle">Cosa vuoi aggiungere?</h2>
+              <p data-i18n="search.welcomeBody">Cerca il prodotto per nome e selezionalo dall’elenco.</p>
             </div>
             <div id="search-results" class="card-list search-results" aria-live="polite"></div>
           </section>
         </main>
 
-        <button id="fab-add" class="fab add-product-trigger" type="button" aria-label="Aggiungi prodotto">
-          <span aria-hidden="true">+</span><span>Aggiungi prodotto</span>
+        <button id="fab-add" class="fab add-product-trigger" type="button" aria-label="Aggiungi prodotto" data-i18n-aria-label="inventory.addProduct">
+          <span aria-hidden="true">+</span><span data-i18n="inventory.addProduct">Aggiungi prodotto</span>
         </button>
 
-        <nav class="bottom-nav" aria-label="Navigazione principale">
+        <nav class="bottom-nav" aria-label="Navigazione principale" data-i18n-aria-label="nav.label">
           <button class="nav-item active" type="button" data-view="inventory" aria-current="page">
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 10h16v10H4zM7 4h10l3 6H4l3-6Z"/><path d="M9 14h6"/></svg>
-            <span>Dispensa</span>
+            <span data-i18n="nav.inventory">Dispensa</span>
           </button>
           <button class="nav-item" type="button" data-view="search">
             <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
-            <span>Aggiungi</span>
+            <span data-i18n="nav.add">Aggiungi</span>
+          </button>
+          <button class="nav-item" type="button" data-view="history">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg>
+            <span data-i18n="nav.history">Storico</span>
           </button>
         </nav>
       </div>
@@ -168,37 +207,37 @@
     <section id="add-sheet" class="bottom-sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" hidden>
       <div class="sheet-handle" aria-hidden="true"></div>
       <div class="sheet-header">
-        <h2 id="sheet-title">Aggiungi alla dispensa</h2>
-        <button id="close-sheet" class="icon-button" type="button" aria-label="Chiudi">×</button>
+        <h2 id="sheet-title" data-i18n="add.sheetTitle">Aggiungi alla dispensa</h2>
+        <button id="close-sheet" class="icon-button" type="button" aria-label="Chiudi" data-i18n-aria-label="common.close">×</button>
       </div>
       <form id="add-form">
         <div id="selected-product" class="selected-product"></div>
         <div class="form-row">
           <div class="field quantity-field">
-            <label>Quantità</label>
-            <div class="stepper" aria-label="Quantità">
-              <button id="quantity-minus" type="button" aria-label="Diminuisci quantità">−</button>
+            <label data-i18n="common.quantity">Quantità</label>
+            <div class="stepper" aria-label="Quantità" data-i18n-aria-label="common.quantity">
+              <button id="quantity-minus" type="button" aria-label="Diminuisci quantità" data-i18n-aria-label="common.decreaseQuantity">−</button>
               <output id="quantity-value" aria-live="polite">1</output>
-              <button id="quantity-plus" type="button" aria-label="Aumenta quantità">+</button>
+              <button id="quantity-plus" type="button" aria-label="Aumenta quantità" data-i18n-aria-label="common.increaseQuantity">+</button>
             </div>
           </div>
           <div class="field date-field">
-            <label for="expiry-date">Scadenza <span>opzionale</span></label>
+            <label for="expiry-date"><span data-i18n="common.expiry">Scadenza</span> <span data-i18n="common.optional">opzionale</span></label>
             <input id="expiry-date" type="date" />
           </div>
         </div>
         <fieldset class="location-fieldset">
-          <legend>Posizione</legend>
+          <legend data-i18n="common.location">Posizione</legend>
           <div class="location-grid">
-            <label><input type="radio" name="location" value="fridge" checked /><span>❄️ Frigorifero</span></label>
-            <label><input type="radio" name="location" value="freezer" /><span>🧊 Congelatore</span></label>
-            <label><input type="radio" name="location" value="pantry" /><span>🥫 Dispensa</span></label>
-            <label><input type="radio" name="location" value="other" /><span>📍 Altro</span></label>
+            <label><input type="radio" name="location" value="fridge" checked /><span>❄️ <span data-i18n="location.fridgeLong">Frigorifero</span></span></label>
+            <label><input type="radio" name="location" value="freezer" /><span>🧊 <span data-i18n="location.freezerLong">Congelatore</span></span></label>
+            <label><input type="radio" name="location" value="pantry" /><span>🥫 <span data-i18n="location.pantry">Dispensa</span></span></label>
+            <label><input type="radio" name="location" value="other" /><span>📍 <span data-i18n="location.other">Altro</span></span></label>
           </div>
         </fieldset>
         <div id="add-error" class="inline-message error" role="alert" hidden></div>
         <button id="confirm-add" class="primary-button full-width" type="submit">
-          <span>Aggiungi alla dispensa</span><span class="button-spinner" aria-hidden="true"></span>
+          <span data-i18n="add.confirm">Aggiungi alla dispensa</span><span class="button-spinner" aria-hidden="true"></span>
         </button>
       </form>
     </section>
@@ -206,35 +245,58 @@
     <section id="inventory-sheet" class="bottom-sheet inventory-sheet" role="dialog" aria-modal="true" aria-labelledby="inventory-sheet-title" hidden>
       <div class="sheet-handle" aria-hidden="true"></div>
       <div class="sheet-header">
-        <h2 id="inventory-sheet-title">Gestisci prodotto</h2>
-        <button id="close-inventory-sheet" class="icon-button" type="button" aria-label="Chiudi">×</button>
+        <h2 id="inventory-sheet-title" data-i18n="inventory.manageTitle">Gestisci prodotto</h2>
+        <button id="close-inventory-sheet" class="icon-button" type="button" aria-label="Chiudi" data-i18n-aria-label="common.close">×</button>
       </div>
       <form id="inventory-edit-form">
         <div id="inventory-edit-product" class="selected-product"></div>
         <div class="field quantity-field inventory-quantity-field">
-          <label>Quantità attuale</label>
-          <div class="stepper" aria-label="Quantità attuale">
-            <button id="inventory-quantity-minus" type="button" aria-label="Diminuisci quantità">−</button>
+          <label data-i18n="inventory.currentQuantity">Quantità attuale</label>
+          <div class="stepper" aria-label="Quantità attuale" data-i18n-aria-label="inventory.currentQuantity">
+            <button id="inventory-quantity-minus" type="button" aria-label="Diminuisci quantità" data-i18n-aria-label="common.decreaseQuantity">−</button>
             <output id="inventory-edit-quantity" aria-live="polite">1</output>
-            <button id="inventory-quantity-plus" type="button" aria-label="Aumenta quantità">+</button>
+            <button id="inventory-quantity-plus" type="button" aria-label="Aumenta quantità" data-i18n-aria-label="common.increaseQuantity">+</button>
           </div>
         </div>
         <fieldset class="summary-location-field inventory-location-field">
-          <legend>Posizione</legend>
+          <legend data-i18n="common.location">Posizione</legend>
           <div id="inventory-edit-location" class="summary-location-grid"></div>
         </fieldset>
         <div id="inventory-edit-error" class="inline-message error" role="alert" hidden></div>
         <button id="save-inventory-edit" class="primary-button full-width" type="submit">
-          <span>Salva modifiche</span><span class="button-spinner" aria-hidden="true"></span>
+          <span data-i18n="inventory.save">Salva modifiche</span><span class="button-spinner" aria-hidden="true"></span>
         </button>
+        <section class="consumption-section" aria-labelledby="consumption-actions-title">
+          <h3 id="consumption-actions-title" data-i18n="consumption.title">Cosa è successo?</h3>
+          <div class="consumption-actions">
+            <button type="button" data-consumption-type="CONSUMED"><span aria-hidden="true">✓</span><span data-i18n="consumption.consumed">Consumato</span></button>
+            <button type="button" data-consumption-type="FINISHED"><span aria-hidden="true">∅</span><span data-i18n="consumption.finished">Finito</span></button>
+            <button type="button" data-consumption-type="DISCARDED"><span aria-hidden="true">×</span><span data-i18n="consumption.discarded">Scartato</span></button>
+          </div>
+          <div id="consumption-confirm" class="consumption-confirm" hidden>
+            <p id="consumption-confirm-text"></p>
+            <div id="consumption-quantity-field" class="consumption-quantity-field">
+              <span data-i18n="common.quantity">Quantità</span>
+              <div class="stepper" aria-label="Quantità" data-i18n-aria-label="common.quantity">
+                <button id="consumption-quantity-minus" type="button" aria-label="Diminuisci quantità" data-i18n-aria-label="common.decreaseQuantity">−</button>
+                <output id="consumption-quantity" aria-live="polite">1</output>
+                <button id="consumption-quantity-plus" type="button" aria-label="Aumenta quantità" data-i18n-aria-label="common.increaseQuantity">+</button>
+              </div>
+            </div>
+            <div class="consumption-confirm-actions">
+              <button id="cancel-consumption" class="secondary-button" type="button" data-i18n="common.cancel">Annulla</button>
+              <button id="confirm-consumption" class="primary-button" type="button"><span data-i18n="consumption.confirm">Conferma</span><span class="button-spinner" aria-hidden="true"></span></button>
+            </div>
+          </div>
+        </section>
         <div class="inventory-remove-area">
-          <button id="remove-inventory-item" class="danger-text-button" type="button">Rimuovi dalla dispensa</button>
+          <button id="remove-inventory-item" class="danger-text-button" type="button" data-i18n="inventory.remove">Rimuovi dalla dispensa</button>
           <div id="inventory-delete-confirm" class="inventory-delete-confirm" role="alert" hidden>
-            <p>Vuoi davvero rimuovere questo prodotto dalla dispensa?</p>
+            <p data-i18n="inventory.removeConfirm">Vuoi davvero rimuovere questo prodotto dalla dispensa?</p>
             <div>
-              <button id="cancel-remove-inventory-item" class="secondary-button" type="button">Annulla</button>
+              <button id="cancel-remove-inventory-item" class="secondary-button" type="button" data-i18n="common.cancel">Annulla</button>
               <button id="confirm-remove-inventory-item" class="danger-button" type="button">
-                <span>Rimuovi</span><span class="button-spinner" aria-hidden="true"></span>
+                <span data-i18n="common.remove">Rimuovi</span><span class="button-spinner" aria-hidden="true"></span>
               </button>
             </div>
           </div>
@@ -245,67 +307,61 @@
     <section id="scanner-modal" class="scanner-modal" role="dialog" aria-modal="true" aria-labelledby="scanner-title" hidden>
       <header class="scanner-header">
         <div>
-          <p class="eyebrow">Aggiunta rapida</p>
-          <h2 id="scanner-title">Scansiona i prodotti</h2>
+          <p class="eyebrow" data-i18n="scanner.eyebrow">Aggiunta rapida</p>
+          <h2 id="scanner-title" data-i18n="scanner.title">Scansiona i prodotti</h2>
         </div>
-        <button id="close-scanner" class="icon-button scanner-close" type="button" aria-label="Chiudi scanner">×</button>
+        <button id="close-scanner" class="icon-button scanner-close" type="button" aria-label="Chiudi scanner" data-i18n-aria-label="scanner.close">×</button>
       </header>
 
       <div id="scanner-live" class="scanner-live">
         <div id="camera-frame" class="camera-frame">
-          <video id="scanner-video" playsinline muted aria-label="Inquadratura della fotocamera"></video>
+          <video id="scanner-video" playsinline muted aria-label="Inquadratura della fotocamera" data-i18n-aria-label="scanner.videoLabel"></video>
           <div class="scan-guide" aria-hidden="true"><span></span></div>
           <div id="camera-loading" class="camera-state">
             <span class="camera-spinner" aria-hidden="true"></span>
-            <strong>Avvio fotocamera…</strong>
+            <strong data-i18n="scanner.cameraStarting">Avvio fotocamera…</strong>
           </div>
           <div id="camera-error" class="camera-state camera-error" role="alert" hidden>
             <span aria-hidden="true">!</span>
-            <strong>Fotocamera non disponibile</strong>
+            <strong data-i18n="scanner.cameraUnavailable">Fotocamera non disponibile</strong>
             <p id="camera-error-message"></p>
-            <button id="scanner-manual-search" class="secondary-button" type="button">Usa la ricerca manuale</button>
+            <button id="scanner-manual-search" class="secondary-button" type="button" data-i18n="scanner.manualSearch">Usa la ricerca manuale</button>
           </div>
         </div>
 
         <div id="scan-feedback" class="scan-feedback">
           <span class="feedback-dot" aria-hidden="true"></span>
-          <span id="scan-feedback-text" role="status" aria-live="polite">Inquadra un barcode</span>
+          <span id="scan-feedback-text" role="status" aria-live="polite" data-i18n="scanner.framePrompt">Inquadra un barcode</span>
           <button id="scan-add-one" class="scan-add-one" type="button" hidden>+1</button>
         </div>
 
         <section class="scan-session" aria-labelledby="scan-session-title">
           <div class="scan-session-heading">
-            <h3 id="scan-session-title">Ultimi prodotti</h3>
+            <h3 id="scan-session-title" data-i18n="scanner.recent">Ultimi prodotti</h3>
             <span id="scan-total" class="count-badge">0 unità</span>
           </div>
           <div id="scan-recent" class="scan-recent" aria-live="polite">
-            <p class="scan-empty">I prodotti riconosciuti appariranno qui.</p>
+            <p class="scan-empty" data-i18n="scanner.emptyRecent">I prodotti riconosciuti appariranno qui.</p>
           </div>
         </section>
 
-        <button id="finish-scanning" class="primary-button full-width scanner-action" type="button">Termina scansione</button>
+        <button id="finish-scanning" class="primary-button full-width scanner-action" type="button" data-i18n="scanner.finish">Termina scansione</button>
       </div>
 
       <div id="scanner-summary" class="scanner-summary" hidden>
-        <p class="summary-intro">Controlla quantità e scegli la destinazione di ogni prodotto.</p>
+        <p class="summary-intro" data-i18n="scanner.summaryIntro">Controlla quantità e scegli la destinazione di ogni prodotto.</p>
         <div id="summary-empty" class="state-card small-state" hidden>
           <div class="state-icon" aria-hidden="true">0</div>
-          <h2>Nessun prodotto scansionato</h2>
-          <p>Torna alla scansione o usa la ricerca manuale.</p>
+          <h2 data-i18n="scanner.emptyTitle">Nessun prodotto scansionato</h2>
+          <p data-i18n="scanner.emptyBody">Torna alla scansione o usa la ricerca manuale.</p>
         </div>
         <div id="summary-list" class="summary-list" aria-live="polite"></div>
 
-        <div id="summary-options" class="summary-options">
-          <div class="field">
-            <label for="scan-expiry-date">Scadenza comune <span>opzionale</span></label>
-            <input id="scan-expiry-date" type="date" />
-          </div>
-        </div>
         <div id="scanner-save-error" class="inline-message error" role="alert" hidden></div>
         <div class="summary-actions">
-          <button id="resume-scanning" class="secondary-button" type="button">Continua a scansionare</button>
+          <button id="resume-scanning" class="secondary-button" type="button" data-i18n="scanner.resume">Continua a scansionare</button>
           <button id="confirm-scanned" class="primary-button" type="button">
-            <span>Aggiungi alla dispensa</span><span class="button-spinner" aria-hidden="true"></span>
+            <span data-i18n="scanner.confirm">Aggiungi alla dispensa</span><span class="button-spinner" aria-hidden="true"></span>
           </button>
         </div>
       </div>

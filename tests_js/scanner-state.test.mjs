@@ -7,6 +7,7 @@ import {
   BarcodePresenceTracker,
   addSessionUnit,
   sessionIsReadyToSave,
+  setSessionItemExpiry,
   setSessionItemLocation
 } from "../frontend/scanner-state.mjs";
 
@@ -153,6 +154,24 @@ test("quantity changes preserve the selected product location", () => {
   addSessionUnit(session, A, productA);
   assert.equal(session.get(A).quantity, 2);
   assert.equal(session.get(A).storageLocation, "pantry");
+});
+
+test("different scanned products retain independent optional expiry dates", () => {
+  const session = new Map();
+  addSessionUnit(session, A, productA);
+  addSessionUnit(session, B, { barcode: B, name: "Latte" });
+  setSessionItemExpiry(session, A, "2027-02-15");
+  setSessionItemExpiry(session, B, "2026-09-08");
+  assert.equal(session.get(A).expiryDate, "2027-02-15");
+  assert.equal(session.get(B).expiryDate, "2026-09-08");
+});
+
+test("a missing expiry date does not prevent scanner confirmation", () => {
+  const session = new Map();
+  addSessionUnit(session, A, productA);
+  setSessionItemLocation(session, A, "pantry");
+  assert.equal(session.get(A).expiryDate, null);
+  assert.equal(sessionIsReadyToSave(session), true);
 });
 
 test("removing an unassigned product recalculates readiness from remaining products", () => {

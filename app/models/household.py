@@ -36,6 +36,9 @@ class Household(Base):
     inventory_items = relationship(
         "InventoryItem", back_populates="household", cascade="all, delete-orphan"
     )
+    consumption_events = relationship(
+        "ConsumptionEvent", back_populates="household", cascade="all, delete-orphan"
+    )
 
 
 class HouseholdMember(Base):
