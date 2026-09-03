@@ -382,6 +382,9 @@ def test_shopping_ui_supports_quick_add_all_states_actions_and_i18n(client):
     assert 'method: "PATCH"' in script
     assert 'method: "DELETE"' in script
     assert "data-shopping-status" in script
+    assert 'role="checkbox"' in script
+    assert 'aria-checked="${item.is_completed ? "true" : "false"}"' in script
+    assert 'class="shopping-checkbox-mark"' in script
     assert 'title="${escapeHtml(actionLabel)}"' in script
     assert 'item.is_completed ? "shopping.restoreItem" : "shopping.markPurchased"' in script
     assert "data-shopping-edit" in script

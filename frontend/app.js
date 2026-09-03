@@ -399,7 +399,7 @@ function shoppingItemMarkup(item) {
     { name: item.name }
   );
   return `<article class="shopping-item${item.is_completed ? " completed" : ""}" data-shopping-id="${escapeHtml(item.id)}">
-    <button class="shopping-status" type="button" data-shopping-status="${escapeHtml(item.id)}" aria-label="${escapeHtml(actionLabel)}" title="${escapeHtml(actionLabel)}"><span aria-hidden="true">${item.is_completed ? "✓" : ""}</span></button>
+    <button class="shopping-status" type="button" role="checkbox" aria-checked="${item.is_completed ? "true" : "false"}" data-shopping-status="${escapeHtml(item.id)}" aria-label="${escapeHtml(actionLabel)}" title="${escapeHtml(actionLabel)}"><span class="shopping-checkbox-mark" aria-hidden="true">${item.is_completed ? "✓" : ""}</span></button>
     <div class="shopping-item-copy">
       <h3>${escapeHtml(item.name)}</h3>
       <div class="shopping-item-meta">${item.quantity !== null ? `<span>×${item.quantity}</span>` : ""}${item.note ? `<span>${escapeHtml(item.note)}</span>` : ""}</div>

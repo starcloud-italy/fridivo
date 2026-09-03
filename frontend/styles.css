@@ -238,10 +238,10 @@ body.sheet-open { overflow: hidden; }
 .shopping-item { display: grid; grid-template-columns: 50px minmax(0,1fr) 46px; align-items: center; gap: 9px; min-width: 0; border: 1px solid rgba(63,107,87,.1); border-radius: 17px; padding: 9px; background: white; box-shadow: 0 5px 18px rgba(42,70,57,.045); }
 .shopping-status, .shopping-edit-button { display: grid; place-items: center; min-width: 46px; min-height: 46px; border-radius: 14px; }
 .shopping-status { border: 0; background: transparent; color: white; }
-.shopping-status span { display: grid; place-items: center; width: 30px; height: 30px; border: 2px solid var(--green); border-radius: 50%; background: white; font-size: 17px; font-weight: 850; }
-.shopping-status:hover span { background: #edf3ec; }
+.shopping-checkbox-mark { display: grid; place-items: center; width: 28px; height: 28px; border: 2px solid var(--green); border-radius: 6px; background: white; font-size: 18px; font-weight: 850; line-height: 1; }
+.shopping-status:hover .shopping-checkbox-mark { background: #edf3ec; }
 .shopping-status:focus-visible { outline: 3px solid rgba(121,168,107,.34); outline-offset: 1px; }
-.shopping-item.completed .shopping-status span { border-color: var(--green); background: var(--green); }
+.shopping-item.completed .shopping-checkbox-mark { border-color: var(--green); background: var(--green); }
 .shopping-item-copy { min-width: 0; }
 .shopping-item-copy h3 { overflow-wrap: anywhere; margin: 0; font-size: 15px; line-height: 1.25; }
 .shopping-item-meta { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 5px; color: var(--muted); font-size: 12px; line-height: 1.35; }

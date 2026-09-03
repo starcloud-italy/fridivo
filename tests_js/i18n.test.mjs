@@ -39,8 +39,8 @@ test("dynamic messages interpolate in the selected language", () => {
   assert.equal(translate("en", "scanner.alreadyScanned", { name: "Baiocchi", quantity: 2 }), "Already scanned · Baiocchi ×2");
   assert.equal(translate("it", "shopping.markPurchased", { name: "Latte" }), "Segna Latte come acquistato");
   assert.equal(translate("en", "shopping.markPurchased", { name: "Milk" }), "Mark Milk as purchased");
-  assert.equal(translate("it", "shopping.checkHint"), "Tocca il cerchio quando acquisti un prodotto.");
-  assert.equal(translate("en", "shopping.checkHint"), "Tap the circle when you purchase an item.");
+  assert.equal(translate("it", "shopping.checkHint"), "Spunta la casella quando acquisti un prodotto.");
+  assert.equal(translate("en", "shopping.checkHint"), "Check the box when you purchase an item.");
 });
 
 test("product data passed into translations is preserved", () => {
