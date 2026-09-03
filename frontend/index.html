@@ -53,6 +53,59 @@
               <span class="button-spinner" aria-hidden="true"></span>
             </button>
           </form>
+          <p class="auth-mode-prompt"><span data-i18n="login.noAccount">Non hai ancora un account?</span> <button id="show-register" class="auth-mode-button" type="button" data-i18n="login.signUp">Registrati</button></p>
+        </div>
+      </main>
+
+      <main id="register-screen" class="login-screen" hidden>
+        <div class="login-card register-card">
+          <div class="login-toolbar">
+            <img class="login-logo" src="/assets/assets/fridivo-logo.png" alt="Fridivo" />
+            <div class="language-switcher" role="group" aria-label="Cambia lingua" data-i18n-aria-label="language.selector">
+              <button type="button" data-language="it" aria-pressed="true">IT</button><span aria-hidden="true">|</span><button type="button" data-language="en" aria-pressed="false">EN</button>
+            </div>
+          </div>
+          <div class="login-copy register-copy">
+            <p class="eyebrow" data-i18n="register.eyebrow">Benvenuto</p>
+            <h1 data-i18n="register.title">Crea il tuo account</h1>
+            <p data-i18n="register.intro">Bastano pochi dati per iniziare.</p>
+          </div>
+
+          <form id="register-form" novalidate>
+            <div class="field">
+              <label for="register-name" data-i18n="register.name">Nome</label>
+              <input id="register-name" name="first_name" maxlength="100" autocomplete="given-name" placeholder="Il tuo nome" data-i18n-placeholder="register.namePlaceholder" required />
+            </div>
+            <div class="field">
+              <label for="register-email" data-i18n="login.email">Email</label>
+              <input id="register-email" name="email" type="email" inputmode="email" autocomplete="email" placeholder="nome@esempio.it" data-i18n-placeholder="login.emailPlaceholder" required />
+            </div>
+            <div class="field">
+              <label for="register-password" data-i18n="login.password">Password</label>
+              <div class="password-field">
+                <input id="register-password" name="password" type="password" minlength="8" maxlength="128" autocomplete="new-password" placeholder="Almeno 8 caratteri" data-i18n-placeholder="register.passwordPlaceholder" required />
+                <button id="toggle-register-password" class="icon-button password-toggle" type="button" aria-label="Mostra password" data-i18n-aria-label="login.showPassword">
+                  <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"/><circle cx="12" cy="12" r="2.5"/></svg>
+                </button>
+              </div>
+            </div>
+            <div class="field">
+              <label for="register-confirm-password" data-i18n="register.confirmPassword">Conferma password</label>
+              <div class="password-field">
+                <input id="register-confirm-password" name="confirm_password" type="password" minlength="8" maxlength="128" autocomplete="new-password" placeholder="Ripeti la password" data-i18n-placeholder="register.confirmPasswordPlaceholder" required />
+                <button id="toggle-register-confirm-password" class="icon-button password-toggle" type="button" aria-label="Mostra password" data-i18n-aria-label="login.showPassword">
+                  <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"/><circle cx="12" cy="12" r="2.5"/></svg>
+                </button>
+              </div>
+            </div>
+            <div id="register-error" class="inline-message error" role="alert" hidden></div>
+            <div id="register-duplicate-error" class="inline-message error" role="alert" hidden><span data-i18n="register.duplicateEmail">Esiste già un account con questa email.</span> <button id="duplicate-sign-in" class="inline-auth-button" type="button" data-i18n="register.trySignIn">Prova ad accedere</button></div>
+            <button id="register-button" class="primary-button full-width" type="submit">
+              <span data-i18n="register.submit">Crea account</span>
+              <span class="button-spinner" aria-hidden="true"></span>
+            </button>
+          </form>
+          <p class="auth-mode-prompt"><span data-i18n="register.haveAccount">Hai già un account?</span> <button id="show-login" class="auth-mode-button" type="button" data-i18n="register.signIn">Accedi</button></p>
         </div>
       </main>
 

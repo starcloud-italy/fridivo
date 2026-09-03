@@ -6,6 +6,7 @@ import {
   setSessionItemLocation
 } from "./scanner-state.mjs";
 import { resolveInitialLanguage, translate } from "./i18n.mjs";
+import { registrationPayload, registrationValidationKey } from "./registration.mjs";
 
 const config = window.__FRIDIVO_CONFIG__ || {};
 const API_BASE_URL = String(config.apiBaseUrl || "").replace(/\/$/, "");
@@ -26,8 +27,9 @@ const locale = () => currentLanguage === "it" ? "it-IT" : "en";
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
 const elements = {
-  boot: $("#boot-screen"), login: $("#login-screen"), authenticated: $("#authenticated-app"),
+  boot: $("#boot-screen"), login: $("#login-screen"), register: $("#register-screen"), authenticated: $("#authenticated-app"),
   loginForm: $("#login-form"), loginButton: $("#login-button"), loginError: $("#login-error"),
+  registerForm: $("#register-form"), registerButton: $("#register-button"), registerError: $("#register-error"), registerDuplicateError: $("#register-duplicate-error"),
   inventoryView: $("#inventory-view"), searchView: $("#search-view"), historyView: $("#history-view"), insightsView: $("#insights-view"), shoppingView: $("#shopping-view"), inventoryList: $("#inventory-list"),
   inventoryLoading: $("#inventory-loading"), inventoryEmpty: $("#inventory-empty"), inventoryError: $("#inventory-error"),
   inventoryCount: $("#inventory-count"), fab: $("#fab-add"), searchForm: $("#search-form"),
@@ -108,7 +110,7 @@ async function api(path, options = {}) {
   } catch {
     throw new ApiError(0, "network_error");
   }
-  if (response.status === 401 && path !== "/api/v1/auth/login") {
+  if (response.status === 401 && !["/api/v1/auth/login", "/api/v1/auth/register"].includes(path)) {
     clearSession();
     showLogin(t("error.sessionExpired"));
     throw new ApiError(401, "session_expired");
@@ -140,6 +142,7 @@ function clearSession() {
 function showLogin(message = "") {
   elements.boot.hidden = true;
   elements.authenticated.hidden = true;
+  elements.register.hidden = true;
   elements.login.hidden = false;
   closeSheet();
   closeInventorySheet();
@@ -148,15 +151,27 @@ function showLogin(message = "") {
   setMessage(elements.loginError, message);
 }
 
+function showRegister() {
+  elements.boot.hidden = true;
+  elements.authenticated.hidden = true;
+  elements.login.hidden = true;
+  elements.register.hidden = false;
+  setMessage(elements.loginError);
+  setMessage(elements.registerError);
+  elements.registerDuplicateError.hidden = true;
+}
+
 function showApp() {
   elements.boot.hidden = true;
   elements.login.hidden = true;
+  elements.register.hidden = true;
   elements.authenticated.hidden = false;
   showView("inventory");
 }
 
 function userMessage(error, context) {
   if (error.status === 0) return t("error.network");
+  if (context === "register") return error.status === 422 ? t("error.validation") : t("register.error");
   if (error.status === 401) return t(context === "login" ? "error.invalidCredentials" : "error.sessionExpired");
   if (error.status === 404) {
     if (context === "consumption") return t("error.inventoryItemMissing");
@@ -645,8 +660,20 @@ function refreshLocalizedView() {
     renderScanSession();
     if (!elements.scannerSummary.hidden) renderScannerSummary();
   }
-  const passwordVisible = $("#password").type === "text";
-  $("#toggle-password").setAttribute("aria-label", t(passwordVisible ? "login.hidePassword" : "login.showPassword"));
+  updatePasswordToggleLabel("#password", "#toggle-password");
+  updatePasswordToggleLabel("#register-password", "#toggle-register-password");
+  updatePasswordToggleLabel("#register-confirm-password", "#toggle-register-confirm-password");
+}
+
+function updatePasswordToggleLabel(inputSelector, buttonSelector) {
+  const visible = $(inputSelector).type === "text";
+  $(buttonSelector).setAttribute("aria-label", t(visible ? "login.hidePassword" : "login.showPassword"));
+}
+
+function togglePasswordVisibility(inputSelector, buttonSelector) {
+  const input = $(inputSelector);
+  input.type = input.type === "password" ? "text" : "password";
+  updatePasswordToggleLabel(inputSelector, buttonSelector);
 }
 
 function setLanguage(language, { persist = true } = {}) {
@@ -1053,12 +1080,43 @@ elements.loginForm.addEventListener("submit", async (event) => {
   } finally { setLoading(elements.loginButton, false); }
 });
 
-$("#toggle-password").addEventListener("click", () => {
-  const password = $("#password");
-  const visible = password.type === "text";
-  password.type = visible ? "password" : "text";
-  $("#toggle-password").setAttribute("aria-label", t(visible ? "login.showPassword" : "login.hidePassword"));
+elements.registerForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (elements.registerButton.disabled) return;
+  setMessage(elements.registerError);
+  elements.registerDuplicateError.hidden = true;
+  const values = {
+    firstName: elements.registerForm.elements.first_name.value,
+    email: elements.registerForm.elements.email.value,
+    password: elements.registerForm.elements.password.value,
+    confirmPassword: elements.registerForm.elements.confirm_password.value
+  };
+  const validationKey = registrationValidationKey(values);
+  if (validationKey) { setMessage(elements.registerError, t(validationKey)); return; }
+  setLoading(elements.registerButton, true);
+  try {
+    const response = await api("/api/v1/auth/register", {
+      method: "POST",
+      body: JSON.stringify(registrationPayload(values, currentLanguage))
+    });
+    token = response.access_token;
+    sessionStorage.setItem(TOKEN_KEY, token);
+    elements.registerForm.reset();
+    showApp();
+  } catch (error) {
+    if (error.status === 409) elements.registerDuplicateError.hidden = false;
+    else setMessage(elements.registerError, userMessage(error, "register"));
+  } finally {
+    setLoading(elements.registerButton, false);
+  }
 });
+
+$("#toggle-password").addEventListener("click", () => togglePasswordVisibility("#password", "#toggle-password"));
+$("#toggle-register-password").addEventListener("click", () => togglePasswordVisibility("#register-password", "#toggle-register-password"));
+$("#toggle-register-confirm-password").addEventListener("click", () => togglePasswordVisibility("#register-confirm-password", "#toggle-register-confirm-password"));
+$("#show-register").addEventListener("click", () => { showRegister(); $("#register-name").focus(); });
+$("#show-login").addEventListener("click", () => { showLogin(); $("#email").focus(); });
+$("#duplicate-sign-in").addEventListener("click", () => { showLogin(); $("#email").focus(); });
 
 $("#logout-button").addEventListener("click", () => { clearSession(); showLogin(); });
 $$('[data-language]').forEach((button) => button.addEventListener("click", () => setLanguage(button.dataset.language)));

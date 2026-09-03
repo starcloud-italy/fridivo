@@ -5,13 +5,14 @@ def test_frontend_is_served_from_root(client):
     assert response.headers["content-type"].startswith("text/html")
     assert "La tua dispensa" in response.text
     assert "Aggiungi prodotto" in response.text
-    assert "Registrati" not in response.text
+    assert "Registrati" in response.text
 
 
 def test_frontend_assets_and_runtime_config_are_available(client):
     stylesheet = client.get("/assets/styles.css")
     script = client.get("/assets/app.js")
     scanner_state = client.get("/assets/scanner-state.mjs")
+    registration = client.get("/assets/registration.mjs")
     i18n = client.get("/assets/i18n.mjs")
     zxing = client.get("/assets/vendor/zxing-browser-0.2.1.min.js")
     zxing_license = client.get("/assets/vendor/ZXING-LICENSE.txt")
@@ -22,6 +23,7 @@ def test_frontend_assets_and_runtime_config_are_available(client):
     assert "#3f6b57" in stylesheet.text.lower()
     assert script.status_code == 200
     assert scanner_state.status_code == 200
+    assert registration.status_code == 200
     assert i18n.status_code == 200
     assert "TRANSLATIONS" in i18n.text
     assert "class BarcodePresenceTracker" in scanner_state.text
@@ -43,7 +45,7 @@ def test_official_logo_replaces_placeholders_without_distortion(client):
     html = client.get("/").text
     stylesheet = client.get("/assets/styles.css").text
 
-    assert html.count('src="/assets/assets/fridivo-logo.png"') == 3
+    assert html.count('src="/assets/assets/fridivo-logo.png"') == 4
     assert 'class="boot-logo"' in html
     assert 'class="login-logo"' in html
     assert 'class="header-logo"' in html
@@ -253,13 +255,72 @@ def test_language_switch_is_manual_persistent_and_does_not_reload(client):
     html = client.get("/").text
     script = client.get("/assets/app.js").text
 
-    assert html.count('data-language="it"') == 2
-    assert html.count('data-language="en"') == 2
+    assert html.count('data-language="it"') == 3
+    assert html.count('data-language="en"') == 3
     assert 'localStorage.getItem(LANGUAGE_KEY)' in script
     assert 'localStorage.setItem(LANGUAGE_KEY, language)' in script
     assert "applyStaticTranslations()" in script
     assert "refreshLocalizedView()" in script
     assert "window.location.reload" not in script
+
+
+def test_registration_ui_validates_submits_and_reuses_the_existing_session(client):
+    html = client.get("/").text
+    script = client.get("/assets/app.js").text
+    registration = client.get("/assets/registration.mjs").text
+    i18n = client.get("/assets/i18n.mjs").text
+    stylesheet = client.get("/assets/styles.css").text
+
+    for fragment in (
+        'id="show-register"',
+        'id="register-screen"',
+        'id="register-form"',
+        'name="first_name"',
+        'name="email" type="email"',
+        'name="password" type="password" minlength="8" maxlength="128"',
+        'name="confirm_password" type="password" minlength="8" maxlength="128"',
+        'id="register-duplicate-error"',
+        'id="duplicate-sign-in"',
+        'id="show-login"',
+    ):
+        assert fragment in html
+
+    assert 'api("/api/v1/auth/register"' in script
+    assert "registrationValidationKey(values)" in script
+    assert "registrationPayload(values, currentLanguage)" in script
+    assert "if (elements.registerButton.disabled) return" in script
+    assert "setLoading(elements.registerButton, true)" in script
+    assert "setLoading(elements.registerButton, false)" in script
+    assert "error.status === 409" in script
+    assert "response.access_token" in script
+    assert "sessionStorage.setItem(TOKEN_KEY, token)" in script
+    assert "elements.registerForm.reset()" in script
+    assert "showApp()" in script
+    assert 'confirm_password" in registrationPayload' not in registration
+    assert "confirm_password" not in registration
+    assert 'language_code: languageCode' in registration
+    assert "REGISTRATION_PASSWORD_MIN_LENGTH = 8" in registration
+    assert "REGISTRATION_PASSWORD_MAX_LENGTH = 128" in registration
+    assert ".auth-mode-button" in stylesheet
+    assert "min-height: 44px" in stylesheet
+
+    for key in (
+        "login.noAccount",
+        "login.signUp",
+        "register.title",
+        "register.name",
+        "register.confirmPassword",
+        "register.submit",
+        "register.haveAccount",
+        "register.signIn",
+        "register.duplicateEmail",
+        "register.validationName",
+        "register.validationEmail",
+        "register.validationPasswordLength",
+        "register.validationPasswordMismatch",
+        "register.error",
+    ):
+        assert i18n.count(f'"{key}"') == 2
 
 
 def test_static_dynamic_scanner_and_inventory_texts_are_localized(client):

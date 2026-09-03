@@ -41,6 +41,12 @@ test("dynamic messages interpolate in the selected language", () => {
   assert.equal(translate("en", "shopping.markPurchased", { name: "Milk" }), "Mark Milk as purchased");
   assert.equal(translate("it", "shopping.checkHint"), "Spunta la casella quando acquisti un prodotto.");
   assert.equal(translate("en", "shopping.checkHint"), "Check the box when you purchase an item.");
+  assert.equal(translate("it", "register.title"), "Crea il tuo account");
+  assert.equal(translate("en", "register.title"), "Create your account");
+  assert.equal(translate("it", "register.validationPasswordMismatch"), "Le password non coincidono.");
+  assert.equal(translate("en", "register.validationPasswordMismatch"), "The passwords do not match.");
+  assert.equal(translate("it", "register.duplicateEmail"), "Esiste già un account con questa email.");
+  assert.equal(translate("en", "register.duplicateEmail"), "An account with this email already exists.");
 });
 
 test("product data passed into translations is preserved", () => {
