@@ -15,17 +15,14 @@
   <body>
     <div id="app" class="app-shell">
       <section id="boot-screen" class="center-screen" aria-label="Caricamento" data-i18n-aria-label="inventory.loading">
-        <div class="brand-mark" aria-hidden="true">F</div>
+        <img class="boot-logo" src="/assets/assets/fridivo-logo.png" alt="Fridivo" />
         <p class="muted" data-i18n="boot.loading">Prepariamo la tua dispensa…</p>
       </section>
 
       <main id="login-screen" class="login-screen" hidden>
         <div class="login-card">
           <div class="login-toolbar">
-            <div class="brand-lockup">
-              <div class="brand-mark" aria-hidden="true">F</div>
-              <span>Fridivo</span>
-            </div>
+            <img class="login-logo" src="/assets/assets/fridivo-logo.png" alt="Fridivo" />
             <div class="language-switcher" role="group" aria-label="Cambia lingua" data-i18n-aria-label="language.selector">
               <button type="button" data-language="it" aria-pressed="true">IT</button><span aria-hidden="true">|</span><button type="button" data-language="en" aria-pressed="false">EN</button>
             </div>
@@ -61,8 +58,8 @@
 
       <div id="authenticated-app" hidden>
         <header class="topbar">
-          <div>
-            <div class="wordmark"><span class="wordmark-dot">F</span> Fridivo</div>
+          <div class="app-branding">
+            <img class="header-logo" src="/assets/assets/fridivo-logo.png" alt="Fridivo" />
             <p id="page-kicker" class="page-kicker" data-i18n="app.home">La tua casa</p>
           </div>
           <div class="topbar-actions">

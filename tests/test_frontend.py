@@ -16,6 +16,7 @@ def test_frontend_assets_and_runtime_config_are_available(client):
     zxing = client.get("/assets/vendor/zxing-browser-0.2.1.min.js")
     zxing_license = client.get("/assets/vendor/ZXING-LICENSE.txt")
     config = client.get("/app-config.js")
+    logo = client.get("/assets/assets/fridivo-logo.png")
 
     assert stylesheet.status_code == 200
     assert "#3f6b57" in stylesheet.text.lower()
@@ -34,6 +35,24 @@ def test_frontend_assets_and_runtime_config_are_available(client):
     assert config.status_code == 200
     assert config.headers["cache-control"] == "no-store"
     assert '"apiBaseUrl": ""' in config.text
+    assert logo.status_code == 200
+    assert logo.headers["content-type"] == "image/png"
+
+
+def test_official_logo_replaces_placeholders_without_distortion(client):
+    html = client.get("/").text
+    stylesheet = client.get("/assets/styles.css").text
+
+    assert html.count('src="/assets/assets/fridivo-logo.png"') == 3
+    assert 'class="boot-logo"' in html
+    assert 'class="login-logo"' in html
+    assert 'class="header-logo"' in html
+    assert "brand-mark" not in html
+    assert "wordmark-dot" not in html
+    assert ".login-logo" in stylesheet
+    assert ".header-logo" in stylesheet
+    assert "height: auto" in stylesheet
+    assert "object-fit: contain" in stylesheet
 
 
 def test_frontend_does_not_render_backend_identifiers(client):
@@ -362,6 +381,8 @@ def test_shopping_ui_supports_quick_add_all_states_actions_and_i18n(client):
     assert 'method: "PATCH"' in script
     assert 'method: "DELETE"' in script
     assert "data-shopping-status" in script
+    assert 'title="${escapeHtml(actionLabel)}"' in script
+    assert 'item.is_completed ? "shopping.restoreItem" : "shopping.markPurchased"' in script
     assert "data-shopping-edit" in script
     assert "shoppingItems = [saved" in script
     assert "min-height: 46px" in styles
@@ -374,6 +395,8 @@ def test_shopping_ui_supports_quick_add_all_states_actions_and_i18n(client):
         "shopping.edit",
         "shopping.delete",
         "shopping.restore",
+        "shopping.markPurchased",
+        "shopping.restoreItem",
         "shopping.name",
         "shopping.note",
         "shopping.emptyTitle",

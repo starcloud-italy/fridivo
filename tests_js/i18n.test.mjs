@@ -37,6 +37,8 @@ test("dynamic messages interpolate in the selected language", () => {
   assert.equal(translate("it", "inventory.countMany", { count: 3 }), "3 prodotti");
   assert.equal(translate("en", "inventory.countMany", { count: 3 }), "3 products");
   assert.equal(translate("en", "scanner.alreadyScanned", { name: "Baiocchi", quantity: 2 }), "Already scanned · Baiocchi ×2");
+  assert.equal(translate("it", "shopping.markPurchased", { name: "Latte" }), "Segna Latte come acquistato");
+  assert.equal(translate("en", "shopping.markPurchased", { name: "Milk" }), "Mark Milk as purchased");
 });
 
 test("product data passed into translations is preserved", () => {
