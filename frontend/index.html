@@ -136,6 +136,31 @@
             <div id="history-list" class="history-list" aria-live="polite"></div>
           </section>
 
+          <section id="insights-view" class="view" aria-labelledby="insights-title" hidden>
+            <div class="page-heading">
+              <div>
+                <p class="eyebrow" data-i18n="insights.eyebrow">Ultimi 30 giorni</p>
+                <h1 id="insights-title" data-i18n="insights.title">Insight</h1>
+              </div>
+            </div>
+            <div id="insights-loading" class="insights-loading" aria-label="Caricamento insight" data-i18n-aria-label="insights.loading" hidden>
+              <div class="insight-summary skeleton-card"></div>
+              <div class="insight-product skeleton-card"></div>
+            </div>
+            <div id="insights-error" class="state-card" hidden>
+              <div class="state-icon error-icon" aria-hidden="true">!</div>
+              <h2 data-i18n="insights.errorTitle">Non riusciamo a caricare gli insight</h2>
+              <p data-i18n="insights.errorBody">Riprova tra qualche istante.</p>
+              <button id="retry-insights" class="secondary-button" type="button" data-i18n="common.retry">Riprova</button>
+            </div>
+            <div id="insights-empty" class="state-card empty-state" hidden>
+              <div class="state-icon" aria-hidden="true">·</div>
+              <h2 data-i18n="insights.noData">Nessun dato disponibile</h2>
+              <p data-i18n="insights.empty">Non ci sono ancora dati di consumo sufficienti.</p>
+            </div>
+            <div id="insights-content" aria-live="polite"></div>
+          </section>
+
           <section id="search-view" class="view" aria-labelledby="search-title" hidden>
             <div class="page-heading compact-heading">
               <div>
@@ -198,6 +223,10 @@
           <button class="nav-item" type="button" data-view="history">
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg>
             <span data-i18n="nav.history">Storico</span>
+          </button>
+          <button class="nav-item" type="button" data-view="insights">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 19V11M12 19V5M19 19V8"/></svg>
+            <span data-i18n="nav.insights">Insight</span>
           </button>
         </nav>
       </div>

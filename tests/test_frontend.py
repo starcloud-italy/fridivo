@@ -296,6 +296,45 @@ def test_consumption_and_history_ui_use_existing_i18n_and_api(client):
         assert f'"{key}"' in i18n
 
 
+def test_insights_ui_has_all_states_navigation_dynamic_data_and_i18n(client):
+    html = client.get("/").text
+    script = client.get("/assets/app.js").text
+    styles = client.get("/assets/styles.css").text
+    i18n = client.get("/assets/i18n.mjs").text
+
+    assert 'data-view="insights"' in html
+    assert 'id="insights-view"' in html
+    assert 'id="insights-loading"' in html
+    assert 'id="insights-empty"' in html
+    assert 'id="insights-error"' in html
+    assert 'id="insights-content"' in html
+    assert 'api("/api/v1/insights/consumption")' in script
+    assert "summary.consumed_quantity" in script
+    assert "summary.discarded_quantity" in script
+    assert "data.most_consumed" in script
+    assert "data.most_discarded" in script
+    assert "data.products.map(insightProductDetail)" in script
+    assert '$("#retry-insights").addEventListener("click", loadInsights)' in script
+    assert "grid-template-columns: repeat(4, minmax(0,1fr))" in styles
+    assert "min-width: 0" in styles
+    for key in (
+        "nav.insights",
+        "insights.eyebrow",
+        "insights.title",
+        "insights.loading",
+        "insights.empty",
+        "insights.errorTitle",
+        "insights.consumed",
+        "insights.discarded",
+        "insights.productsTracked",
+        "insights.waste",
+        "insights.mostConsumed",
+        "insights.mostDiscarded",
+        "insights.lastEvent",
+    ):
+        assert i18n.count(f'"{key}"') == 2
+
+
 def test_scanner_uses_individual_optional_expiry_dates(client):
     html = client.get("/").text
     script = client.get("/assets/app.js").text

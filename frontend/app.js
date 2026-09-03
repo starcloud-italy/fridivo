@@ -28,10 +28,11 @@ const $$ = (selector) => [...document.querySelectorAll(selector)];
 const elements = {
   boot: $("#boot-screen"), login: $("#login-screen"), authenticated: $("#authenticated-app"),
   loginForm: $("#login-form"), loginButton: $("#login-button"), loginError: $("#login-error"),
-  inventoryView: $("#inventory-view"), searchView: $("#search-view"), historyView: $("#history-view"), inventoryList: $("#inventory-list"),
+  inventoryView: $("#inventory-view"), searchView: $("#search-view"), historyView: $("#history-view"), insightsView: $("#insights-view"), inventoryList: $("#inventory-list"),
   inventoryLoading: $("#inventory-loading"), inventoryEmpty: $("#inventory-empty"), inventoryError: $("#inventory-error"),
   inventoryCount: $("#inventory-count"), fab: $("#fab-add"), searchForm: $("#search-form"),
   historyList: $("#history-list"), historyLoading: $("#history-loading"), historyEmpty: $("#history-empty"), historyError: $("#history-error"),
+  insightsContent: $("#insights-content"), insightsLoading: $("#insights-loading"), insightsEmpty: $("#insights-empty"), insightsError: $("#insights-error"),
   searchInput: $("#search-input"), clearSearch: $("#clear-search"), searchResults: $("#search-results"),
   searchLoading: $("#search-loading"), searchEmpty: $("#search-empty"), searchError: $("#search-error"), searchWelcome: $("#search-welcome"),
   backdrop: $("#sheet-backdrop"), sheet: $("#add-sheet"), selectedProduct: $("#selected-product"),
@@ -58,6 +59,8 @@ let inventoryItems = [];
 let inventoryLoaded = false;
 let historyItems = [];
 let historyLoaded = false;
+let insightsData = null;
+let insightsLoaded = false;
 let searchResultItems = [];
 let selectedInventoryItem = null;
 let inventoryEditQuantity = 1;
@@ -294,13 +297,99 @@ async function loadHistory() {
   }
 }
 
+function formatWasteRatio(value) {
+  return new Intl.NumberFormat(locale(), { style: "percent", maximumFractionDigits: 0 }).format(value);
+}
+
+function insightEventCount(product) {
+  return product.consumed_event_count + product.finished_event_count + product.discarded_event_count;
+}
+
+function insightProductCard(product, metric) {
+  const amount = metric === "discarded" ? product.discarded_quantity : product.consumed_quantity;
+  const amountKey = metric === "discarded" ? "insights.discardedQuantity" : "insights.usedQuantity";
+  const ratio = metric === "discarded" && product.waste_ratio !== null
+    ? `<span>${escapeHtml(t("insights.waste"))}: ${escapeHtml(formatWasteRatio(product.waste_ratio))}</span>`
+    : "";
+  return `<article class="insight-product">
+    ${productImage(product)}
+    <div class="insight-product-copy">
+      <h3 class="product-name">${escapeHtml(product.product_name || t("common.product"))}</h3>
+      ${product.brands ? `<p class="product-brand">${escapeHtml(product.brands)}</p>` : ""}
+      <div class="insight-product-meta"><strong>${escapeHtml(t(amountKey, { count: amount }))}</strong>${ratio}</div>
+    </div>
+  </article>`;
+}
+
+function insightProductDetail(product) {
+  const eventDate = new Intl.DateTimeFormat(locale(), {
+    day: "2-digit", month: "2-digit", year: "numeric"
+  }).format(new Date(product.last_event_at));
+  const ratio = product.waste_ratio === null
+    ? ""
+    : `<span>${escapeHtml(t("insights.waste"))}: <strong>${escapeHtml(formatWasteRatio(product.waste_ratio))}</strong></span>`;
+  return `<details class="insight-detail">
+    <summary>${productImage(product)}<span><strong>${escapeHtml(product.product_name || t("common.product"))}</strong>${product.brands ? `<small>${escapeHtml(product.brands)}</small>` : ""}</span><span class="select-cue" aria-hidden="true">›</span></summary>
+    <div class="insight-detail-metrics">
+      <span>${escapeHtml(t("insights.consumed"))}: <strong>${product.consumed_quantity}</strong></span>
+      <span>${escapeHtml(t("insights.discarded"))}: <strong>${product.discarded_quantity}</strong></span>
+      <span>${escapeHtml(t("insights.events"))}: <strong>${insightEventCount(product)}</strong></span>
+      ${ratio}
+      <span class="insight-last-event">${escapeHtml(t("insights.lastEvent"))}: <strong>${escapeHtml(t(consumptionTypeKeys[product.last_event]))}</strong> · ${escapeHtml(eventDate)}</span>
+    </div>
+  </details>`;
+}
+
+function renderInsights(data) {
+  const summary = data.summary;
+  elements.insightsEmpty.hidden = summary.distinct_products !== 0;
+  if (summary.distinct_products === 0) {
+    elements.insightsContent.innerHTML = "";
+    return;
+  }
+  const waste = summary.waste_ratio === null ? "" : `
+    <div><span>${escapeHtml(t("insights.waste"))}</span><strong>${escapeHtml(formatWasteRatio(summary.waste_ratio))}</strong></div>`;
+  const discarded = data.most_discarded.length
+    ? data.most_discarded.map((product) => insightProductCard(product, "discarded")).join("")
+    : `<p class="insight-none">${escapeHtml(t("insights.noDiscarded"))}</p>`;
+  elements.insightsContent.innerHTML = `
+    <section class="insight-summary" aria-label="${escapeHtml(t("insights.eyebrow"))}">
+      <div><span>${escapeHtml(t("insights.consumed"))}</span><strong>${summary.consumed_quantity}</strong></div>
+      <div><span>${escapeHtml(t("insights.discarded"))}</span><strong>${summary.discarded_quantity}</strong></div>
+      <div><span>${escapeHtml(t("insights.productsTracked"))}</span><strong>${summary.distinct_products}</strong></div>
+      ${waste}
+    </section>
+    <section class="insight-section"><h2>${escapeHtml(t("insights.mostConsumed"))}</h2><div class="insight-list">${data.most_consumed.map((product) => insightProductCard(product, "consumed")).join("")}</div></section>
+    <section class="insight-section"><h2>${escapeHtml(t("insights.mostDiscarded"))}</h2><div class="insight-list">${discarded}</div></section>
+    <section class="insight-section"><h2>${escapeHtml(t("insights.allProducts"))}</h2><div class="insight-details">${data.products.map(insightProductDetail).join("")}</div></section>`;
+}
+
+async function loadInsights() {
+  insightsLoaded = false;
+  elements.insightsLoading.hidden = false;
+  elements.insightsError.hidden = true;
+  elements.insightsEmpty.hidden = true;
+  elements.insightsContent.innerHTML = "";
+  try {
+    insightsData = await api("/api/v1/insights/consumption");
+    insightsLoaded = true;
+    renderInsights(insightsData);
+  } catch (error) {
+    if (error.status !== 401) elements.insightsError.hidden = false;
+  } finally {
+    elements.insightsLoading.hidden = true;
+  }
+}
+
 function showView(viewName) {
   const inventory = viewName === "inventory";
   const search = viewName === "search";
   const history = viewName === "history";
+  const insights = viewName === "insights";
   elements.inventoryView.hidden = !inventory;
   elements.searchView.hidden = !search;
   elements.historyView.hidden = !history;
+  elements.insightsView.hidden = !insights;
   elements.fab.hidden = !inventory;
   $$(".nav-item").forEach((item) => {
     const active = item.dataset.view === viewName;
@@ -309,6 +398,7 @@ function showView(viewName) {
   });
   if (inventory) loadInventory();
   if (history) loadHistory();
+  if (insights) loadInsights();
   if (search) setTimeout(() => elements.searchInput.focus(), 50);
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
@@ -457,6 +547,7 @@ function showToast(message) {
 function refreshLocalizedView() {
   if (inventoryLoaded) renderInventory(inventoryItems);
   if (historyLoaded) renderHistory(historyItems);
+  if (insightsLoaded) renderInsights(insightsData);
   if (searchResultItems.length) renderSearchResults(searchResultItems);
   renderSelectedProduct();
   renderInventoryEditProduct();
@@ -885,6 +976,7 @@ $("#logout-button").addEventListener("click", () => { clearSession(); showLogin(
 $$('[data-language]').forEach((button) => button.addEventListener("click", () => setLanguage(button.dataset.language)));
 $("#retry-inventory").addEventListener("click", loadInventory);
 $("#retry-history").addEventListener("click", loadHistory);
+$("#retry-insights").addEventListener("click", loadInsights);
 elements.inventoryList.addEventListener("click", (event) => {
   const card = event.target.closest("[data-inventory-id]");
   if (!card) return;
@@ -1065,6 +1157,7 @@ $("#confirm-consumption").addEventListener("click", async () => {
       ? inventoryItems.map((candidate) => candidate.id === item.id ? { ...candidate, quantity: remaining } : candidate)
       : inventoryItems.filter((candidate) => candidate.id !== item.id);
     historyLoaded = false;
+    insightsLoaded = false;
     renderInventory(inventoryItems);
     closeInventorySheet();
     showToast(t(`success.${eventType.toLowerCase()}`));
