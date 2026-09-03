@@ -91,6 +91,7 @@ def migrated_test_database():
 @pytest.fixture(autouse=True)
 def clean_managed_tables(migrated_test_database):
     with engine.begin() as connection:
+        connection.execute(text("DELETE FROM shopping_list_items"))
         connection.execute(text("DELETE FROM consumption_events"))
         connection.execute(text("DELETE FROM inventory_items"))
         connection.execute(text("DELETE FROM household_members"))

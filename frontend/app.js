@@ -28,11 +28,14 @@ const $$ = (selector) => [...document.querySelectorAll(selector)];
 const elements = {
   boot: $("#boot-screen"), login: $("#login-screen"), authenticated: $("#authenticated-app"),
   loginForm: $("#login-form"), loginButton: $("#login-button"), loginError: $("#login-error"),
-  inventoryView: $("#inventory-view"), searchView: $("#search-view"), historyView: $("#history-view"), insightsView: $("#insights-view"), inventoryList: $("#inventory-list"),
+  inventoryView: $("#inventory-view"), searchView: $("#search-view"), historyView: $("#history-view"), insightsView: $("#insights-view"), shoppingView: $("#shopping-view"), inventoryList: $("#inventory-list"),
   inventoryLoading: $("#inventory-loading"), inventoryEmpty: $("#inventory-empty"), inventoryError: $("#inventory-error"),
   inventoryCount: $("#inventory-count"), fab: $("#fab-add"), searchForm: $("#search-form"),
   historyList: $("#history-list"), historyLoading: $("#history-loading"), historyEmpty: $("#history-empty"), historyError: $("#history-error"),
   insightsContent: $("#insights-content"), insightsLoading: $("#insights-loading"), insightsEmpty: $("#insights-empty"), insightsError: $("#insights-error"),
+  shoppingQuickForm: $("#shopping-quick-form"), shoppingName: $("#shopping-name"), shoppingQuantity: $("#shopping-quantity"), shoppingNote: $("#shopping-note"), shoppingAdd: $("#shopping-add"), shoppingFormError: $("#shopping-form-error"),
+  shoppingActiveSection: $("#shopping-active-section"), shoppingActiveList: $("#shopping-active-list"), shoppingActiveCount: $("#shopping-active-count"), shoppingCompletedSection: $("#shopping-completed-section"), shoppingCompletedList: $("#shopping-completed-list"), shoppingCompletedCount: $("#shopping-completed-count"),
+  shoppingLoading: $("#shopping-loading"), shoppingEmpty: $("#shopping-empty"), shoppingError: $("#shopping-error"),
   searchInput: $("#search-input"), clearSearch: $("#clear-search"), searchResults: $("#search-results"),
   searchLoading: $("#search-loading"), searchEmpty: $("#search-empty"), searchError: $("#search-error"), searchWelcome: $("#search-welcome"),
   backdrop: $("#sheet-backdrop"), sheet: $("#add-sheet"), selectedProduct: $("#selected-product"),
@@ -42,6 +45,7 @@ const elements = {
   inventoryEditProduct: $("#inventory-edit-product"), inventoryEditQuantity: $("#inventory-edit-quantity"),
   inventoryEditLocation: $("#inventory-edit-location"), inventoryEditError: $("#inventory-edit-error"),
   saveInventoryEdit: $("#save-inventory-edit"), inventoryDeleteConfirm: $("#inventory-delete-confirm"),
+  shoppingSheet: $("#shopping-sheet"), shoppingEditForm: $("#shopping-edit-form"), shoppingEditName: $("#shopping-edit-name"), shoppingEditQuantity: $("#shopping-edit-quantity"), shoppingEditNote: $("#shopping-edit-note"), shoppingEditError: $("#shopping-edit-error"), saveShoppingEdit: $("#save-shopping-edit"), shoppingDeleteConfirm: $("#shopping-delete-confirm"),
   consumptionConfirm: $("#consumption-confirm"), consumptionConfirmText: $("#consumption-confirm-text"),
   consumptionQuantityField: $("#consumption-quantity-field"), consumptionQuantity: $("#consumption-quantity"),
   scannerModal: $("#scanner-modal"), scannerLive: $("#scanner-live"), scannerSummary: $("#scanner-summary"),
@@ -61,6 +65,9 @@ let historyItems = [];
 let historyLoaded = false;
 let insightsData = null;
 let insightsLoaded = false;
+let shoppingItems = [];
+let shoppingLoaded = false;
+let selectedShoppingItem = null;
 let searchResultItems = [];
 let selectedInventoryItem = null;
 let inventoryEditQuantity = 1;
@@ -136,6 +143,7 @@ function showLogin(message = "") {
   elements.login.hidden = false;
   closeSheet();
   closeInventorySheet();
+  closeShoppingSheet();
   closeScanner();
   setMessage(elements.loginError, message);
 }
@@ -381,15 +389,65 @@ async function loadInsights() {
   }
 }
 
+function shoppingCountLabel(count) {
+  return t(count === 1 ? "shopping.countOne" : "shopping.countMany", { count });
+}
+
+function shoppingItemMarkup(item) {
+  const actionKey = item.is_completed ? "shopping.restore" : "shopping.purchased";
+  return `<article class="shopping-item${item.is_completed ? " completed" : ""}" data-shopping-id="${escapeHtml(item.id)}">
+    <button class="shopping-status" type="button" data-shopping-status="${escapeHtml(item.id)}" aria-label="${escapeHtml(t(actionKey))}"><span aria-hidden="true">${item.is_completed ? "✓" : ""}</span></button>
+    <div class="shopping-item-copy">
+      <h3>${escapeHtml(item.name)}</h3>
+      <div class="shopping-item-meta">${item.quantity !== null ? `<span>×${item.quantity}</span>` : ""}${item.note ? `<span>${escapeHtml(item.note)}</span>` : ""}</div>
+    </div>
+    <button class="shopping-edit-button" type="button" data-shopping-edit="${escapeHtml(item.id)}" aria-label="${escapeHtml(t("shopping.edit"))}">•••</button>
+  </article>`;
+}
+
+function renderShopping(items) {
+  const active = items.filter((item) => !item.is_completed);
+  const completed = items.filter((item) => item.is_completed);
+  const completedWasOpen = elements.shoppingCompletedSection.open;
+  elements.shoppingActiveSection.hidden = active.length === 0;
+  elements.shoppingEmpty.hidden = active.length !== 0;
+  elements.shoppingCompletedSection.hidden = completed.length === 0;
+  elements.shoppingActiveCount.textContent = shoppingCountLabel(active.length);
+  elements.shoppingCompletedCount.textContent = shoppingCountLabel(completed.length);
+  elements.shoppingActiveList.innerHTML = active.map(shoppingItemMarkup).join("");
+  elements.shoppingCompletedList.innerHTML = completed.map(shoppingItemMarkup).join("");
+  elements.shoppingCompletedSection.open = completedWasOpen;
+}
+
+async function loadShopping() {
+  shoppingLoaded = false;
+  elements.shoppingLoading.hidden = false;
+  elements.shoppingError.hidden = true;
+  elements.shoppingEmpty.hidden = true;
+  elements.shoppingActiveSection.hidden = true;
+  elements.shoppingCompletedSection.hidden = true;
+  try {
+    shoppingItems = await api("/api/v1/shopping-list");
+    shoppingLoaded = true;
+    renderShopping(shoppingItems);
+  } catch (error) {
+    if (error.status !== 401) elements.shoppingError.hidden = false;
+  } finally {
+    elements.shoppingLoading.hidden = true;
+  }
+}
+
 function showView(viewName) {
   const inventory = viewName === "inventory";
   const search = viewName === "search";
   const history = viewName === "history";
   const insights = viewName === "insights";
+  const shopping = viewName === "shopping";
   elements.inventoryView.hidden = !inventory;
   elements.searchView.hidden = !search;
   elements.historyView.hidden = !history;
   elements.insightsView.hidden = !insights;
+  elements.shoppingView.hidden = !shopping;
   elements.fab.hidden = !inventory;
   $$(".nav-item").forEach((item) => {
     const active = item.dataset.view === viewName;
@@ -399,7 +457,9 @@ function showView(viewName) {
   if (inventory) loadInventory();
   if (history) loadHistory();
   if (insights) loadInsights();
+  if (shopping) loadShopping();
   if (search) setTimeout(() => elements.searchInput.focus(), 50);
+  if (shopping) setTimeout(() => elements.shoppingName.focus(), 50);
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
@@ -537,6 +597,30 @@ function closeInventorySheet() {
   lastFocusedElement?.focus();
 }
 
+function openShoppingSheet(item, trigger) {
+  selectedShoppingItem = item;
+  elements.shoppingEditName.value = item.name;
+  elements.shoppingEditQuantity.value = item.quantity ?? "";
+  elements.shoppingEditNote.value = item.note ?? "";
+  setMessage(elements.shoppingEditError);
+  elements.shoppingDeleteConfirm.hidden = true;
+  lastFocusedElement = trigger || document.activeElement;
+  elements.backdrop.hidden = false;
+  elements.shoppingSheet.hidden = false;
+  document.body.classList.add("sheet-open");
+  setTimeout(() => elements.shoppingEditName.focus(), 50);
+}
+
+function closeShoppingSheet() {
+  if (elements.shoppingSheet.hidden) return;
+  elements.shoppingSheet.hidden = true;
+  elements.backdrop.hidden = true;
+  elements.shoppingDeleteConfirm.hidden = true;
+  document.body.classList.remove("sheet-open");
+  selectedShoppingItem = null;
+  lastFocusedElement?.focus();
+}
+
 function showToast(message) {
   clearTimeout(toastTimer);
   elements.toast.textContent = message;
@@ -548,6 +632,7 @@ function refreshLocalizedView() {
   if (inventoryLoaded) renderInventory(inventoryItems);
   if (historyLoaded) renderHistory(historyItems);
   if (insightsLoaded) renderInsights(insightsData);
+  if (shoppingLoaded) renderShopping(shoppingItems);
   if (searchResultItems.length) renderSearchResults(searchResultItems);
   renderSelectedProduct();
   renderInventoryEditProduct();
@@ -977,6 +1062,7 @@ $$('[data-language]').forEach((button) => button.addEventListener("click", () =>
 $("#retry-inventory").addEventListener("click", loadInventory);
 $("#retry-history").addEventListener("click", loadHistory);
 $("#retry-insights").addEventListener("click", loadInsights);
+$("#retry-shopping").addEventListener("click", loadShopping);
 elements.inventoryList.addEventListener("click", (event) => {
   const card = event.target.closest("[data-inventory-id]");
   if (!card) return;
@@ -1099,14 +1185,127 @@ elements.searchForm.addEventListener("submit", (event) => {
 
 $("#close-sheet").addEventListener("click", closeSheet);
 $("#close-inventory-sheet").addEventListener("click", closeInventorySheet);
+$("#close-shopping-sheet").addEventListener("click", closeShoppingSheet);
 elements.backdrop.addEventListener("click", () => {
-  if (!elements.inventorySheet.hidden) closeInventorySheet(); else closeSheet();
+  if (!elements.shoppingSheet.hidden) closeShoppingSheet();
+  else if (!elements.inventorySheet.hidden) closeInventorySheet();
+  else closeSheet();
 });
 document.addEventListener("keydown", (event) => {
   if (event.key !== "Escape") return;
   if (!elements.scannerModal.hidden) closeScanner();
+  else if (!elements.shoppingSheet.hidden) closeShoppingSheet();
   else if (!elements.inventorySheet.hidden) closeInventorySheet();
   else closeSheet();
+});
+
+elements.shoppingQuickForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const name = elements.shoppingName.value.trim();
+  const rawQuantity = elements.shoppingQuantity.value;
+  if (!name) {
+    setMessage(elements.shoppingFormError, t("shopping.validationName"));
+    elements.shoppingName.focus();
+    return;
+  }
+  if (rawQuantity && Number(rawQuantity) < 1) {
+    setMessage(elements.shoppingFormError, t("shopping.validationQuantity"));
+    return;
+  }
+  const payload = { name, quantity: rawQuantity ? Number(rawQuantity) : null, note: elements.shoppingNote.value.trim() || null };
+  setMessage(elements.shoppingFormError);
+  setLoading(elements.shoppingAdd, true);
+  try {
+    const saved = await api("/api/v1/shopping-list", { method: "POST", body: JSON.stringify(payload) });
+    shoppingItems = [saved, ...shoppingItems.filter((item) => item.id !== saved.id)];
+    shoppingLoaded = true;
+    renderShopping(shoppingItems);
+    elements.shoppingQuickForm.reset();
+    elements.shoppingName.focus();
+    showToast(t("shopping.added"));
+  } catch (error) {
+    if (error.status !== 401) setMessage(elements.shoppingFormError, t("shopping.actionError"));
+  } finally {
+    setLoading(elements.shoppingAdd, false);
+  }
+});
+
+elements.shoppingView.addEventListener("click", async (event) => {
+  const editButton = event.target.closest("[data-shopping-edit]");
+  if (editButton) {
+    const item = shoppingItems.find((candidate) => candidate.id === editButton.dataset.shoppingEdit);
+    if (item) openShoppingSheet(item, editButton);
+    return;
+  }
+  const statusButton = event.target.closest("[data-shopping-status]");
+  if (!statusButton) return;
+  const item = shoppingItems.find((candidate) => candidate.id === statusButton.dataset.shoppingStatus);
+  if (!item) return;
+  statusButton.disabled = true;
+  try {
+    const updated = await api(`/api/v1/shopping-list/${item.id}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ is_completed: !item.is_completed })
+    });
+    shoppingItems = [updated, ...shoppingItems.filter((candidate) => candidate.id !== updated.id)];
+    renderShopping(shoppingItems);
+    showToast(t(updated.is_completed ? "shopping.completed" : "shopping.restored"));
+  } catch (error) {
+    if (error.status !== 401) showToast(t("shopping.actionError"));
+    statusButton.disabled = false;
+  }
+});
+
+elements.shoppingEditForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!selectedShoppingItem) return;
+  const name = elements.shoppingEditName.value.trim();
+  const rawQuantity = elements.shoppingEditQuantity.value;
+  if (!name) {
+    setMessage(elements.shoppingEditError, t("shopping.validationName"));
+    return;
+  }
+  setMessage(elements.shoppingEditError);
+  setLoading(elements.saveShoppingEdit, true);
+  try {
+    const updated = await api(`/api/v1/shopping-list/${selectedShoppingItem.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ name, quantity: rawQuantity ? Number(rawQuantity) : null, note: elements.shoppingEditNote.value.trim() || null })
+    });
+    shoppingItems = shoppingItems.map((item) => item.id === updated.id ? updated : item);
+    renderShopping(shoppingItems);
+    closeShoppingSheet();
+    showToast(t("shopping.updated"));
+  } catch (error) {
+    if (error.status !== 401) setMessage(elements.shoppingEditError, t("shopping.actionError"));
+  } finally {
+    setLoading(elements.saveShoppingEdit, false);
+  }
+});
+
+$("#remove-shopping-item").addEventListener("click", () => {
+  elements.shoppingDeleteConfirm.hidden = false;
+  $("#confirm-remove-shopping-item").focus();
+});
+$("#cancel-remove-shopping-item").addEventListener("click", () => {
+  elements.shoppingDeleteConfirm.hidden = true;
+});
+$("#confirm-remove-shopping-item").addEventListener("click", async () => {
+  if (!selectedShoppingItem) return;
+  const itemId = selectedShoppingItem.id;
+  const button = $("#confirm-remove-shopping-item");
+  setLoading(button, true);
+  try {
+    await api(`/api/v1/shopping-list/${itemId}`, { method: "DELETE" });
+    shoppingItems = shoppingItems.filter((item) => item.id !== itemId);
+    renderShopping(shoppingItems);
+    closeShoppingSheet();
+    showToast(t("shopping.deleted"));
+  } catch (error) {
+    if (error.status !== 401) setMessage(elements.shoppingEditError, t("shopping.actionError"));
+  } finally {
+    setLoading(button, false);
+  }
 });
 $("#quantity-minus").addEventListener("click", () => { quantity = Math.max(1, quantity - 1); elements.quantityValue.textContent = quantity; });
 $("#quantity-plus").addEventListener("click", () => { quantity += 1; elements.quantityValue.textContent = quantity; });

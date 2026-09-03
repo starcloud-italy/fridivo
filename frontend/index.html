@@ -161,6 +161,51 @@
             <div id="insights-content" aria-live="polite"></div>
           </section>
 
+          <section id="shopping-view" class="view" aria-labelledby="shopping-title" hidden>
+            <div class="page-heading compact-heading">
+              <div>
+                <p class="eyebrow" data-i18n="shopping.eyebrow">Lista condivisa</p>
+                <h1 id="shopping-title" data-i18n="shopping.title">Lista della spesa</h1>
+              </div>
+            </div>
+            <form id="shopping-quick-form" class="shopping-quick-form">
+              <div class="shopping-quick-row">
+                <input id="shopping-name" name="name" maxlength="200" autocomplete="off" placeholder="Cosa devi comprare?" data-i18n-placeholder="shopping.namePlaceholder" aria-label="Nome" data-i18n-aria-label="shopping.name" required />
+                <button id="shopping-add" class="primary-button" type="submit"><span aria-hidden="true">+</span><span data-i18n="shopping.add">Aggiungi</span><span class="button-spinner" aria-hidden="true"></span></button>
+              </div>
+              <details class="shopping-optionals">
+                <summary data-i18n="shopping.optionalDetails">Quantità e nota (opzionali)</summary>
+                <div class="shopping-optional-fields">
+                  <div class="field"><label for="shopping-quantity" data-i18n="common.quantity">Quantità</label><input id="shopping-quantity" name="quantity" type="number" min="1" inputmode="numeric" /></div>
+                  <div class="field"><label for="shopping-note" data-i18n="shopping.note">Nota</label><input id="shopping-note" name="note" maxlength="500" /></div>
+                </div>
+              </details>
+              <div id="shopping-form-error" class="inline-message error" role="alert" hidden></div>
+            </form>
+            <div id="shopping-loading" class="shopping-list" aria-label="Caricamento lista della spesa" data-i18n-aria-label="shopping.loading" hidden>
+              <div class="shopping-item skeleton-card"></div><div class="shopping-item skeleton-card"></div>
+            </div>
+            <div id="shopping-error" class="state-card" hidden>
+              <div class="state-icon error-icon" aria-hidden="true">!</div>
+              <h2 data-i18n="shopping.errorTitle">Non riusciamo a caricare la lista</h2>
+              <p data-i18n="shopping.errorBody">Riprova tra qualche istante.</p>
+              <button id="retry-shopping" class="secondary-button" type="button" data-i18n="common.retry">Riprova</button>
+            </div>
+            <section id="shopping-active-section" class="shopping-section" aria-labelledby="shopping-active-title" hidden>
+              <div class="shopping-section-heading"><h2 id="shopping-active-title" data-i18n="shopping.toBuy">Da acquistare</h2><span id="shopping-active-count" class="count-badge"></span></div>
+              <div id="shopping-active-list" class="shopping-list" aria-live="polite"></div>
+            </section>
+            <div id="shopping-empty" class="state-card empty-state" hidden>
+              <div class="state-icon" aria-hidden="true">✓</div>
+              <h2 data-i18n="shopping.emptyTitle">Nessun prodotto nella lista</h2>
+              <p data-i18n="shopping.emptyBody">Aggiungi ciò che vuoi comprare.</p>
+            </div>
+            <details id="shopping-completed-section" class="shopping-completed" hidden>
+              <summary><span data-i18n="shopping.purchasedPlural">Acquistati</span><span id="shopping-completed-count" class="count-badge"></span></summary>
+              <div id="shopping-completed-list" class="shopping-list completed-list" aria-live="polite"></div>
+            </details>
+          </section>
+
           <section id="search-view" class="view" aria-labelledby="search-title" hidden>
             <div class="page-heading compact-heading">
               <div>
@@ -227,6 +272,10 @@
           <button class="nav-item" type="button" data-view="insights">
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 19V11M12 19V5M19 19V8"/></svg>
             <span data-i18n="nav.insights">Insight</span>
+          </button>
+          <button class="nav-item" type="button" data-view="shopping">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 5h2l2 10h9l2-7H7M10 20a1 1 0 1 0 0-2 1 1 0 0 0 0 2ZM17 20a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z"/></svg>
+            <span data-i18n="nav.shopping">Spesa</span>
           </button>
         </nav>
       </div>
@@ -328,6 +377,28 @@
                 <span data-i18n="common.remove">Rimuovi</span><span class="button-spinner" aria-hidden="true"></span>
               </button>
             </div>
+          </div>
+        </div>
+      </form>
+    </section>
+
+    <section id="shopping-sheet" class="bottom-sheet" role="dialog" aria-modal="true" aria-labelledby="shopping-sheet-title" hidden>
+      <div class="sheet-handle" aria-hidden="true"></div>
+      <div class="sheet-header">
+        <h2 id="shopping-sheet-title" data-i18n="shopping.editTitle">Modifica voce</h2>
+        <button id="close-shopping-sheet" class="icon-button" type="button" aria-label="Chiudi" data-i18n-aria-label="common.close">×</button>
+      </div>
+      <form id="shopping-edit-form">
+        <div class="field"><label for="shopping-edit-name" data-i18n="shopping.name">Nome</label><input id="shopping-edit-name" name="name" maxlength="200" required /></div>
+        <div class="field"><label for="shopping-edit-quantity" data-i18n="common.quantity">Quantità</label><input id="shopping-edit-quantity" name="quantity" type="number" min="1" inputmode="numeric" /></div>
+        <div class="field"><label for="shopping-edit-note" data-i18n="shopping.note">Nota</label><input id="shopping-edit-note" name="note" maxlength="500" /></div>
+        <div id="shopping-edit-error" class="inline-message error" role="alert" hidden></div>
+        <button id="save-shopping-edit" class="primary-button full-width" type="submit"><span data-i18n="shopping.save">Salva modifiche</span><span class="button-spinner" aria-hidden="true"></span></button>
+        <div class="inventory-remove-area">
+          <button id="remove-shopping-item" class="danger-text-button" type="button" data-i18n="shopping.delete">Elimina</button>
+          <div id="shopping-delete-confirm" class="inventory-delete-confirm" role="alert" hidden>
+            <p data-i18n="shopping.deleteConfirm">Vuoi eliminare questa voce dalla lista?</p>
+            <div><button id="cancel-remove-shopping-item" class="secondary-button" type="button" data-i18n="common.cancel">Annulla</button><button id="confirm-remove-shopping-item" class="danger-button" type="button"><span data-i18n="shopping.delete">Elimina</span><span class="button-spinner" aria-hidden="true"></span></button></div>
           </div>
         </div>
       </form>

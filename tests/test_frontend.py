@@ -315,7 +315,7 @@ def test_insights_ui_has_all_states_navigation_dynamic_data_and_i18n(client):
     assert "data.most_discarded" in script
     assert "data.products.map(insightProductDetail)" in script
     assert '$("#retry-insights").addEventListener("click", loadInsights)' in script
-    assert "grid-template-columns: repeat(4, minmax(0,1fr))" in styles
+    assert "grid-template-columns: repeat(5, minmax(0,1fr))" in styles
     assert "min-width: 0" in styles
     for key in (
         "nav.insights",
@@ -331,6 +331,57 @@ def test_insights_ui_has_all_states_navigation_dynamic_data_and_i18n(client):
         "insights.mostConsumed",
         "insights.mostDiscarded",
         "insights.lastEvent",
+    ):
+        assert i18n.count(f'"{key}"') == 2
+
+
+def test_shopping_ui_supports_quick_add_all_states_actions_and_i18n(client):
+    html = client.get("/").text
+    script = client.get("/assets/app.js").text
+    styles = client.get("/assets/styles.css").text
+    i18n = client.get("/assets/i18n.mjs").text
+
+    for fragment in (
+        'data-view="shopping"',
+        'id="shopping-view"',
+        'id="shopping-quick-form"',
+        'id="shopping-name"',
+        'id="shopping-quantity"',
+        'id="shopping-note"',
+        'id="shopping-loading"',
+        'id="shopping-empty"',
+        'id="shopping-error"',
+        'id="shopping-active-list"',
+        'id="shopping-completed-section"',
+        'id="shopping-sheet"',
+        'id="shopping-delete-confirm"',
+    ):
+        assert fragment in html
+    assert 'api("/api/v1/shopping-list")' in script
+    assert 'method: "POST"' in script
+    assert 'method: "PATCH"' in script
+    assert 'method: "DELETE"' in script
+    assert "data-shopping-status" in script
+    assert "data-shopping-edit" in script
+    assert "shoppingItems = [saved" in script
+    assert "min-height: 46px" in styles
+    for key in (
+        "nav.shopping",
+        "shopping.title",
+        "shopping.toBuy",
+        "shopping.purchased",
+        "shopping.add",
+        "shopping.edit",
+        "shopping.delete",
+        "shopping.restore",
+        "shopping.name",
+        "shopping.note",
+        "shopping.emptyTitle",
+        "shopping.loading",
+        "shopping.errorTitle",
+        "shopping.deleteConfirm",
+        "shopping.completed",
+        "shopping.restored",
     ):
         assert i18n.count(f'"{key}"') == 2
 
