@@ -16,6 +16,7 @@ class ProductCatalogSchemaError(RuntimeError):
 class ProductColumns:
     barcode: str
     name: str
+    countries: str | None
     brands: str | None
     quantity: str | None
     categories: str | None
@@ -26,6 +27,9 @@ class ProductColumns:
 _COLUMN_CANDIDATES = {
     "barcode": ("barcode", "code", "ean", "gtin"),
     "name": ("product_name", "name"),
+    # OFF taxonomy tags are the least ambiguous representation when available.
+    # Some local imports retain only the raw/localized `countries` field.
+    "countries": ("countries_tags", "countries_en", "countries"),
     "brands": ("brands", "brand"),
     "quantity": ("quantity",),
     "categories": ("categories",),
@@ -133,15 +137,51 @@ def search_products(
 ) -> list[CatalogProduct]:
     columns = _columns_for(db)
     projection, barcode_column, name_column = _quoted_projection(db, columns)
+    quote = db.get_bind().dialect.identifier_preparer.quote
     escaped_query = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+    if columns.countries:
+        countries_expression = f"CAST({quote(columns.countries)} AS TEXT)"
+        italy_rank = (
+            f"CASE WHEN {countries_expression} ~* :italy_pattern THEN 0 ELSE 1 END"
+        )
+    else:
+        italy_rank = "1"
+
+    metadata_columns = (columns.brands, columns.quantity, columns.image_url)
+    metadata_score = " + ".join(
+        (
+            f"CASE WHEN NULLIF(BTRIM(CAST({quote(column)} AS TEXT)), '') IS NOT NULL "
+            "THEN 1 ELSE 0 END"
+        )
+        if column
+        else "0"
+        for column in metadata_columns
+    )
+
     statement = text(
         f"SELECT {projection} FROM products "
         f"WHERE {name_column} ILIKE :pattern ESCAPE '\\' "
-        f"ORDER BY {name_column} ASC NULLS LAST, {barcode_column} ASC "
+        "ORDER BY "
+        f"CASE WHEN LOWER(BTRIM({name_column})) = LOWER(:query) THEN 0 "
+        f"WHEN {name_column} ILIKE :prefix_pattern ESCAPE '\\' THEN 1 ELSE 2 END, "
+        f"{italy_rank}, "
+        f"({metadata_score}) DESC, "
+        f"CHAR_LENGTH(BTRIM({name_column})) ASC, "
+        f"LOWER({name_column}) ASC, {name_column} ASC, {barcode_column} ASC "
         "LIMIT :limit OFFSET :offset"
     )
     rows = db.execute(
         statement,
-        {"pattern": f"%{escaped_query}%", "limit": limit, "offset": offset},
+        {
+            "query": query,
+            "pattern": f"%{escaped_query}%",
+            "prefix_pattern": f"{escaped_query}%",
+            "italy_pattern": (
+                r"(^|[^[:alnum:]])((en:)?italy|(it:)?italia)([^[:alnum:]]|$)"
+            ),
+            "limit": limit,
+            "offset": offset,
+        },
     )
     return [_to_product(row) for row in rows]

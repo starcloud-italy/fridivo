@@ -103,6 +103,71 @@ def test_text_search_pagination_and_literal_wildcards(client, registration_paylo
     assert wildcard.json()["items"] == []
 
 
+def test_text_search_prioritizes_italy_without_overriding_stronger_text_match(
+    client, registration_payload
+):
+    response = client.get(
+        "/api/v1/products/search",
+        params={"q": "rankingyogurt"},
+        headers=authenticated_headers(client, registration_payload),
+    )
+
+    assert response.status_code == 200
+    assert [item["barcode"] for item in response.json()["items"]] == [
+        "9000000000101",  # Exact foreign match remains first.
+        "9000000000103",  # Italy / Italia and OFF taxonomy tags all rank as Italy.
+        "9000000000104",
+        "9000000000102",
+        "9000000000105",
+        "9000000000106",  # Foreign prefix match is the fallback for this tier.
+        "9000000000107",  # Italian substring match follows stronger prefix matches.
+        "9000000000108",
+    ]
+
+
+def test_text_search_falls_back_to_foreign_products(client, registration_payload):
+    response = client.get(
+        "/api/v1/products/search",
+        params={"q": "dark chocolate"},
+        headers=authenticated_headers(client, registration_payload),
+    )
+
+    assert response.status_code == 200
+    assert [item["barcode"] for item in response.json()["items"]] == [
+        "4001234567890"
+    ]
+
+
+def test_text_search_ranked_results_respect_limit_and_offset(
+    client, registration_payload
+):
+    headers = authenticated_headers(client, registration_payload)
+    first_page = client.get(
+        "/api/v1/products/search",
+        params={"q": "rankingyogurt", "limit": 3, "offset": 1},
+        headers=headers,
+    )
+    second_page = client.get(
+        "/api/v1/products/search",
+        params={"q": "rankingyogurt", "limit": 3, "offset": 4},
+        headers=headers,
+    )
+
+    assert first_page.status_code == 200
+    assert first_page.json()["limit"] == 3
+    assert first_page.json()["offset"] == 1
+    assert [item["barcode"] for item in first_page.json()["items"]] == [
+        "9000000000103",
+        "9000000000104",
+        "9000000000102",
+    ]
+    assert [item["barcode"] for item in second_page.json()["items"]] == [
+        "9000000000105",
+        "9000000000106",
+        "9000000000107",
+    ]
+
+
 @pytest.mark.parametrize(
     "params",
     ({"q": "x"}, {"q": "   "}, {"q": "pasta", "limit": 101}, {"q": "pasta", "offset": -1}),
@@ -114,4 +179,3 @@ def test_search_input_validation(client, registration_payload, params):
         headers=authenticated_headers(client, registration_payload),
     )
     assert response.status_code == 422
-
