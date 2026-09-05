@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, PrimaryKeyConstraint, String, func
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, PrimaryKeyConstraint, String, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -37,6 +37,19 @@ class Household(Base):
         nullable=False,
         default=HouseholdPlan.FREE,
         server_default=HouseholdPlan.FREE.value,
+    )
+    stripe_customer_id: Mapped[str | None] = mapped_column(
+        String(255), unique=True, nullable=True
+    )
+    stripe_subscription_id: Mapped[str | None] = mapped_column(
+        String(255), unique=True, nullable=True
+    )
+    subscription_status: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    subscription_current_period_end: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    subscription_cancel_at_period_end: Mapped[bool | None] = mapped_column(
+        Boolean, nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()

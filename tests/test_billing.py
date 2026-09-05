@@ -71,6 +71,9 @@ def test_free_household_creates_subscription_checkout_from_server_values(
     assert params["mode"] == "subscription"
     assert params["line_items"] == [{"price": "price_from_server", "quantity": 1}]
     assert params["metadata"] == {"household_id": current["id"]}
+    assert params["subscription_data"] == {
+        "metadata": {"household_id": current["id"]}
+    }
     assert params["client_reference_id"] == current["id"]
     assert params["customer_email"] == registration_payload["email"]
     assert params["success_url"] == "http://testserver/?checkout=success"
@@ -145,3 +148,24 @@ def test_stripe_error_is_mapped_without_provider_detail(
     assert response.status_code == 502
     assert response.json() == {"detail": "Billing is temporarily unavailable"}
     assert "provider-sensitive-detail" not in response.text
+
+
+def test_checkout_reuses_persisted_stripe_customer(
+    client, registration_payload, monkeypatch
+):
+    registered = register(client, registration_payload)
+    with Session(engine) as db:
+        household = db.scalar(select(Household))
+        assert household is not None
+        household.stripe_customer_id = "cus_existing"
+        db.commit()
+    captured = {}
+    configure_checkout(monkeypatch, captured)
+
+    response = client.post(
+        "/api/v1/billing/checkout", headers=auth(registered["access_token"])
+    )
+
+    assert response.status_code == 200
+    assert captured["params"]["customer"] == "cus_existing"
+    assert "customer_email" not in captured["params"]

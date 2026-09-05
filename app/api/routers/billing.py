@@ -4,10 +4,14 @@ from app.api.dependencies import CurrentUser, DbSession
 from app.models.household import HouseholdPlan
 from app.schemas.billing import CheckoutSessionRead
 from app.services.billing import (
+    BillingAssociationError,
     BillingConfigurationError,
+    BillingEventError,
     BillingProviderError,
     CheckoutReturnUrls,
+    construct_stripe_event,
     create_plus_checkout_session,
+    process_stripe_event,
 )
 from app.services.household import get_current_household
 
@@ -51,3 +55,31 @@ def create_checkout(
             detail="Billing is temporarily unavailable",
         ) from None
     return CheckoutSessionRead(url=checkout_url)
+
+
+@router.post("/webhook")
+async def stripe_webhook(request: Request, db: DbSession) -> dict[str, bool]:
+    payload = await request.body()
+    try:
+        event = construct_stripe_event(payload, request.headers.get("Stripe-Signature"))
+        processed = process_stripe_event(db, event)
+    except BillingEventError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid webhook"
+        ) from None
+    except BillingConfigurationError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Billing is temporarily unavailable",
+        ) from None
+    except BillingAssociationError:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Webhook cannot be associated",
+        ) from None
+    except BillingProviderError:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Billing is temporarily unavailable",
+        ) from None
+    return {"received": True, "duplicate": not processed}

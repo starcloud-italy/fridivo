@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     stripe_plus_monthly_price_id: str | None = Field(
         default=None, validation_alias="STRIPE_PLUS_MONTHLY_PRICE_ID"
     )
+    stripe_webhook_secret: SecretStr | None = Field(
+        default=None, validation_alias="STRIPE_WEBHOOK_SECRET"
+    )
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

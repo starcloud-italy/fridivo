@@ -1,5 +1,6 @@
-from app.models.household import Household, HouseholdMember, HouseholdPlan, HouseholdRole
+from app.models.billing import StripeWebhookEvent
 from app.models.consumption import ConsumptionEvent, ConsumptionEventType
+from app.models.household import Household, HouseholdMember, HouseholdPlan, HouseholdRole
 from app.models.inventory import InventoryItem, StorageLocation
 from app.models.product import CatalogProduct
 from app.models.shopping import ShoppingListItem
@@ -11,6 +12,7 @@ __all__ = [
     "HouseholdMember",
     "HouseholdPlan",
     "HouseholdRole",
+    "StripeWebhookEvent",
     "ConsumptionEvent",
     "ConsumptionEventType",
     "InventoryItem",
