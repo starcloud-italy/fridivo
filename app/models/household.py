@@ -14,6 +14,11 @@ class HouseholdRole(str, enum.Enum):
     MEMBER = "member"
 
 
+class HouseholdPlan(str, enum.Enum):
+    FREE = "FREE"
+    PLUS = "PLUS"
+
+
 class Household(Base):
     __tablename__ = "households"
 
@@ -23,6 +28,16 @@ class Household(Base):
     default_language_code: Mapped[str] = mapped_column(String(10), nullable=False)
     currency_code: Mapped[str] = mapped_column(String(3), nullable=False, default="EUR")
     timezone: Mapped[str] = mapped_column(String(64), nullable=False)
+    plan: Mapped[HouseholdPlan] = mapped_column(
+        Enum(
+            HouseholdPlan,
+            name="household_plan",
+            values_callable=lambda enum_type: [item.value for item in enum_type],
+        ),
+        nullable=False,
+        default=HouseholdPlan.FREE,
+        server_default=HouseholdPlan.FREE.value,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )

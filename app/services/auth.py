@@ -3,7 +3,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.security import create_access_token, hash_password, verify_password
-from app.models.household import Household, HouseholdMember, HouseholdRole
+from app.models.household import Household, HouseholdMember, HouseholdPlan, HouseholdRole
 from app.models.user import User
 from app.schemas.auth import RegisterRequest
 
@@ -31,6 +31,7 @@ def register_user(db: Session, data: RegisterRequest) -> tuple[User, str]:
         default_language_code=data.language_code,
         currency_code=data.currency_code,
         timezone=data.timezone,
+        plan=HouseholdPlan.FREE,
     )
     membership = HouseholdMember(user=user, household=household, role=HouseholdRole.OWNER)
     db.add_all((user, household, membership))
@@ -49,4 +50,3 @@ def authenticate_user(db: Session, email: str, password: str) -> User | None:
     if user is None or not user.is_active or not verify_password(password, user.password_hash):
         return None
     return user
-

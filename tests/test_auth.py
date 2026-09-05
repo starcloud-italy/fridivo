@@ -2,7 +2,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.session import engine
-from app.models.household import Household, HouseholdMember, HouseholdRole
+from app.models.household import Household, HouseholdMember, HouseholdPlan, HouseholdRole
 from app.models.user import User
 
 
@@ -57,10 +57,23 @@ def test_registration_atomically_creates_household_owner(client, registration_pa
         assert household.default_language_code == "it"
         assert household.currency_code == "EUR"
         assert household.timezone == "Europe/Rome"
+        assert household.plan is HouseholdPlan.FREE
         assert membership is not None
         assert str(membership.user_id) == user_id
         assert membership.household_id == household.id
         assert membership.role is HouseholdRole.OWNER
+
+
+def test_client_cannot_choose_plus_during_registration(client, registration_payload):
+    registration_payload["plan"] = "PLUS"
+
+    response = register(client, registration_payload)
+
+    assert response.status_code == 201
+    with Session(engine) as db:
+        household = db.scalar(select(Household))
+        assert household is not None
+        assert household.plan is HouseholdPlan.FREE
 
 
 def test_valid_and_invalid_login(client, registration_payload):
@@ -100,4 +113,3 @@ def test_me_requires_valid_bearer_and_returns_current_user(client, registration_
     assert response.status_code == 200
     assert response.json()["id"] == registered["user"]["id"]
     assert response.json()["email"] == registration_payload["email"]
-

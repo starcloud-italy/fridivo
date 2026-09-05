@@ -1,6 +1,8 @@
-from sqlalchemy import text
+from sqlalchemy import select, text
+from sqlalchemy.orm import Session
 
 from app.db.session import engine
+from app.models.household import Household, HouseholdPlan
 
 
 def register(client, payload):
@@ -11,6 +13,22 @@ def register(client, payload):
 
 def auth(token):
     return {"Authorization": f"Bearer {token}"}
+
+
+def test_new_household_model_defaults_to_free():
+    household = Household(
+        name="Test household",
+        country_code="IT",
+        default_language_code="it",
+        currency_code="EUR",
+        timezone="Europe/Rome",
+    )
+
+    with Session(engine) as db:
+        db.add(household)
+        db.commit()
+        db.refresh(household)
+        assert household.plan is HouseholdPlan.FREE
 
 
 def test_current_household_returns_owner_membership(client, registration_payload):
@@ -25,6 +43,40 @@ def test_current_household_returns_owner_membership(client, registration_payload
     assert response.json()["role"] == "owner"
     assert response.json()["currency_code"] == "EUR"
     assert response.json()["timezone"] == "Europe/Rome"
+    assert response.json()["plan"] == "FREE"
+
+
+def test_current_household_returns_plus_when_set_by_backend(client, registration_payload):
+    registered = register(client, registration_payload)
+    with Session(engine) as db:
+        household = db.scalar(select(Household))
+        assert household is not None
+        household.plan = HouseholdPlan.PLUS
+        db.commit()
+
+    response = client.get(
+        "/api/v1/households/current", headers=auth(registered["access_token"])
+    )
+
+    assert response.status_code == 200
+    assert response.json()["plan"] == "PLUS"
+
+
+def test_household_plan_cannot_be_changed_via_public_api(client, registration_payload):
+    registered = register(client, registration_payload)
+
+    response = client.patch(
+        "/api/v1/households/current",
+        headers=auth(registered["access_token"]),
+        json={"plan": "PLUS"},
+    )
+
+    assert response.status_code == 405
+    current = client.get(
+        "/api/v1/households/current", headers=auth(registered["access_token"])
+    )
+    assert current.status_code == 200
+    assert current.json()["plan"] == "FREE"
 
 
 def test_current_household_requires_authentication(client):
@@ -70,4 +122,3 @@ def test_health(client):
     response = client.get("/health")
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
-

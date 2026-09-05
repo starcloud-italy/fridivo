@@ -3,7 +3,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
-from app.models.household import HouseholdRole
+from app.models.household import HouseholdPlan, HouseholdRole
 
 
 class HouseholdRead(BaseModel):
@@ -15,7 +15,7 @@ class HouseholdRead(BaseModel):
     default_language_code: str
     currency_code: str
     timezone: str
+    plan: HouseholdPlan
     role: HouseholdRole
     created_at: datetime
     updated_at: datetime
-
