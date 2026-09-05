@@ -1296,34 +1296,18 @@ function resumeScanning() {
   startCamera();
 }
 
-async function updateExistingInventoryItem(existing, scannedItem, storageLocation) {
-  const payload = { quantity: existing.quantity + scannedItem.quantity, storage_location: storageLocation };
-  if (scannedItem.expiryDate) payload.expiry_date = scannedItem.expiryDate;
-  return api(`/api/v1/inventory/${existing.id}`, { method: "PATCH", body: JSON.stringify(payload) });
-}
-
-async function saveScannedItem(scannedItem, inventoryByBarcode) {
+async function saveScannedItem(scannedItem) {
   const barcode = scannedItem.product.barcode;
   const storageLocation = scannedItem.storageLocation;
-  const existing = inventoryByBarcode.get(barcode);
-  if (existing) return updateExistingInventoryItem(existing, scannedItem, storageLocation);
-  try {
-    return await api("/api/v1/inventory", {
-      method: "POST",
-      body: JSON.stringify({
-        product_barcode: barcode,
-        quantity: scannedItem.quantity,
-        expiry_date: scannedItem.expiryDate || null,
-        storage_location: storageLocation
-      })
-    });
-  } catch (error) {
-    if (error.status !== 409) throw error;
-    const refreshed = await api("/api/v1/inventory");
-    const concurrentItem = refreshed.find((item) => item.product_barcode === barcode);
-    if (!concurrentItem) throw error;
-    return updateExistingInventoryItem(concurrentItem, scannedItem, storageLocation);
-  }
+  return api("/api/v1/inventory", {
+    method: "POST",
+    body: JSON.stringify({
+      product_barcode: barcode,
+      quantity: scannedItem.quantity,
+      expiry_date: scannedItem.expiryDate || null,
+      storage_location: storageLocation
+    })
+  });
 }
 
 elements.loginForm.addEventListener("submit", async (event) => {
@@ -1500,12 +1484,9 @@ elements.confirmScanned.addEventListener("click", async () => {
   setLoading(elements.confirmScanned, true);
   const failures = [];
   try {
-    const inventory = await api("/api/v1/inventory");
-    const inventoryByBarcode = new Map(inventory.map((item) => [item.product_barcode, item]));
     for (const [barcode, scannedItem] of items) {
       try {
-        const saved = await saveScannedItem(scannedItem, inventoryByBarcode);
-        inventoryByBarcode.set(barcode, saved);
+        await saveScannedItem(scannedItem);
         scanSession.delete(barcode);
       } catch (error) {
         if (error.status === 401) throw error;

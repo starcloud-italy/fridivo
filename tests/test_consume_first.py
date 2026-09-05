@@ -145,5 +145,33 @@ def test_equal_expiry_dates_use_barcode_as_deterministic_tie_break(
     ]
 
 
+def test_incremented_item_is_reflected_in_consume_first_without_a_duplicate_row(
+    client, registration_payload
+):
+    user = register(client, registration_payload)
+    set_plus(user)
+    existing = add_item(client, user, "0801234567890", FIXED_TODAY, quantity=2)
+
+    incremented = add_item(
+        client,
+        user,
+        "0801234567890",
+        FIXED_TODAY + timedelta(days=10),
+        quantity=1,
+        location="freezer",
+    )
+    priorities = client.get("/api/v1/inventory/consume-first", headers=auth(user)).json()
+    inventory = client.get("/api/v1/inventory", headers=auth(user)).json()
+
+    assert incremented["id"] == existing["id"]
+    assert incremented["quantity"] == 3
+    assert incremented["expiry_date"] == FIXED_TODAY.isoformat()
+    assert incremented["storage_location"] == "fridge"
+    assert len(inventory) == 1
+    assert len(priorities) == 1
+    assert priorities[0]["id"] == existing["id"]
+    assert priorities[0]["quantity"] == 3
+
+
 def test_consume_first_requires_authentication(client):
     assert client.get("/api/v1/inventory/consume-first").status_code == 401

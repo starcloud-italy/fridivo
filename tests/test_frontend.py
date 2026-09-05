@@ -191,6 +191,7 @@ def test_add_view_exposes_a_localized_collapsible_manual_barcode_lookup(client):
 
     assert 'id="manual-barcode-disclosure"' in html
     assert 'data-i18n="barcode.enter"' in html
+    assert "Inserisci barcode digitandolo manualmente" in html
     assert 'id="manual-barcode-form"' in html
     assert 'type="text" inputmode="numeric"' in html
     assert 'pattern="[0-9]{8,14}"' in html
@@ -202,6 +203,19 @@ def test_add_view_exposes_a_localized_collapsible_manual_barcode_lookup(client):
     assert 'userMessage(error, "barcode")' in script
     for key in ("barcode.enter", "barcode.label", "barcode.find", "barcode.validation"):
         assert translations.count(f'"{key}"') == 2
+    assert '"barcode.enter": "Inserisci barcode digitandolo manualmente"' in translations
+    assert '"barcode.enter": "Enter barcode manually"' in translations
+
+
+def test_all_product_discovery_flows_share_the_inventory_post(client):
+    script = client.get("/assets/app.js").text
+
+    assert "openSheet(products[Number(button.dataset.index)], button)" in script
+    assert "openSheet(product, elements.manualBarcodeInput)" in script
+    assert "async function saveScannedItem(scannedItem)" in script
+    assert script.count('api("/api/v1/inventory", {') >= 2
+    assert "await saveScannedItem(scannedItem)" in script
+    assert "inventoryByBarcode" not in script
 
 
 def test_scanner_has_camera_errors_continuous_session_and_finish_controls(client):
@@ -288,7 +302,7 @@ def test_scanner_summary_is_editable_and_only_saves_after_confirmation(client):
     assert "setSessionItemExpiry(scanSession" in script
     assert 'method: "POST"' in script
     assert 'method: "PATCH"' in script
-    assert "existing.quantity + scannedItem.quantity" in script
+    assert "await saveScannedItem(scannedItem)" in script
     assert "const storageLocation = scannedItem.storageLocation" in script
     assert "storage_location: storageLocation" in script
 
@@ -601,7 +615,6 @@ def test_scanner_uses_individual_optional_expiry_dates(client):
     assert "Shared expiry date" not in client.get("/assets/i18n.mjs").text
     assert 'data-summary-expiry' in script
     assert "scannedItem.expiryDate || null" in script
-    assert "if (scannedItem.expiryDate) payload.expiry_date = scannedItem.expiryDate" in script
     assert "elements.confirmScanned.disabled = !sessionIsReadyToSave(scanSession)" in script
 
 

@@ -3,7 +3,7 @@ from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy import func, select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.dialects.postgresql import insert as postgresql_insert
 from sqlalchemy.orm import Session
 
 from app.models.household import HouseholdPlan
@@ -23,10 +23,6 @@ class ProductNotFoundError(Exception):
 
 
 class InventoryItemNotFoundError(Exception):
-    pass
-
-
-class InventoryItemAlreadyExistsError(Exception):
     pass
 
 
@@ -62,28 +58,27 @@ def create_inventory_item(
     product = get_product_by_barcode(db, data.product_barcode)
     if product is None:
         raise ProductNotFoundError
-    duplicate = db.scalar(
-        select(InventoryItem.id).where(
-            InventoryItem.household_id == household_id,
-            InventoryItem.product_barcode == data.product_barcode,
-        )
-    )
-    if duplicate is not None:
-        raise InventoryItemAlreadyExistsError
 
-    item = InventoryItem(
+    insert_statement = postgresql_insert(InventoryItem).values(
         household_id=household_id,
         product_barcode=data.product_barcode,
         quantity=data.quantity,
         expiry_date=data.expiry_date,
         storage_location=data.storage_location,
     )
-    db.add(item)
-    try:
-        db.commit()
-    except IntegrityError as exc:
-        db.rollback()
-        raise InventoryItemAlreadyExistsError from exc
+    statement = insert_statement.on_conflict_do_update(
+        constraint="uq_inventory_items_household_product",
+        set_={
+            "quantity": InventoryItem.quantity + insert_statement.excluded.quantity,
+            "expiry_date": func.coalesce(
+                InventoryItem.expiry_date,
+                insert_statement.excluded.expiry_date,
+            ),
+            "updated_at": func.now(),
+        },
+    ).returning(InventoryItem)
+    item = db.scalars(statement).one()
+    db.commit()
     db.refresh(item)
     return item, product
 

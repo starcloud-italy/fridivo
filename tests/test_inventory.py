@@ -208,15 +208,59 @@ def test_missing_inventory_item(client, registration_payload, method):
     assert response.status_code == 404
 
 
-def test_duplicate_product_does_not_create_multiple_lots(client, registration_payload):
+def test_existing_product_is_incremented_without_creating_multiple_lots(
+    client, registration_payload
+):
     user = register(client, registration_payload)
     headers = auth(user)
-    create_item(client, headers)
+    existing = create_item(client, headers, quantity=2)
     response = client.post(
-        "/api/v1/inventory", json=item_payload(quantity=3), headers=headers
+        "/api/v1/inventory",
+        json=item_payload(
+            quantity=1,
+            expiry_date="2027-06-30",
+            storage_location="freezer",
+        ),
+        headers=headers,
     )
-    assert response.status_code == 409
-    assert len(client.get("/api/v1/inventory", headers=headers).json()) == 1
+    assert response.status_code == 201
+    assert response.json()["id"] == existing["id"]
+    assert response.json()["quantity"] == 3
+    assert response.json()["expiry_date"] == "2026-12-31"
+    assert response.json()["storage_location"] == "pantry"
+    items = client.get("/api/v1/inventory", headers=headers).json()
+    assert len(items) == 1
+    assert items[0]["quantity"] == 3
+
+
+def test_increment_can_fill_a_missing_expiry_without_changing_location(
+    client, registration_payload
+):
+    user = register(client, registration_payload)
+    headers = auth(user)
+    existing = create_item(
+        client,
+        headers,
+        quantity=2,
+        expiry_date=None,
+        storage_location="fridge",
+    )
+
+    response = client.post(
+        "/api/v1/inventory",
+        json=item_payload(
+            quantity=1,
+            expiry_date="2027-01-15",
+            storage_location="freezer",
+        ),
+        headers=headers,
+    )
+
+    assert response.status_code == 201
+    assert response.json()["id"] == existing["id"]
+    assert response.json()["quantity"] == 3
+    assert response.json()["expiry_date"] == "2027-01-15"
+    assert response.json()["storage_location"] == "fridge"
 
 
 def test_scanner_style_addition_increments_an_existing_inventory_item(client, registration_payload):
@@ -225,16 +269,13 @@ def test_scanner_style_addition_increments_an_existing_inventory_item(client, re
     existing = create_item(client, headers, quantity=2)
 
     scanned_quantity = 3
-    response = client.patch(
-        f"/api/v1/inventory/{existing['id']}",
-        json={
-            "quantity": existing["quantity"] + scanned_quantity,
-            "storage_location": "pantry",
-        },
+    response = client.post(
+        "/api/v1/inventory",
+        json=item_payload(quantity=scanned_quantity),
         headers=headers,
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 201
     assert response.json()["quantity"] == 5
     items = client.get("/api/v1/inventory", headers=headers).json()
     assert len(items) == 1
@@ -256,3 +297,20 @@ def test_inventory_is_isolated_between_households(client, registration_payload):
     assert patch.status_code == 404
     assert delete.status_code == 404
     assert client.get("/api/v1/inventory", headers=auth(owner)).json()[0]["quantity"] == 2
+
+
+def test_increment_is_scoped_to_the_current_household(client, registration_payload):
+    owner = register(client, registration_payload, email="owner@example.com")
+    stranger = register(client, registration_payload, email="stranger@example.com")
+    create_item(client, auth(owner), quantity=2)
+    create_item(client, auth(stranger), quantity=5)
+
+    incremented = client.post(
+        "/api/v1/inventory",
+        json=item_payload(quantity=1),
+        headers=auth(owner),
+    )
+
+    assert incremented.status_code == 201
+    assert incremented.json()["quantity"] == 3
+    assert client.get("/api/v1/inventory", headers=auth(stranger)).json()[0]["quantity"] == 5

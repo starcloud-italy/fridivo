@@ -54,8 +54,8 @@ test("product data passed into translations is preserved", () => {
 });
 
 test("manual barcode controls and validation are localized", () => {
-  assert.equal(translate("it", "barcode.enter"), "Inserisci barcode");
-  assert.equal(translate("en", "barcode.enter"), "Enter barcode");
+  assert.equal(translate("it", "barcode.enter"), "Inserisci barcode digitandolo manualmente");
+  assert.equal(translate("en", "barcode.enter"), "Enter barcode manually");
   assert.equal(translate("it", "barcode.label"), "Codice a barre");
   assert.equal(translate("en", "barcode.label"), "Barcode");
   assert.equal(translate("it", "barcode.find"), "Cerca prodotto");

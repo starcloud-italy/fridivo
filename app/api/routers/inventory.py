@@ -14,7 +14,6 @@ from app.schemas.inventory import (
 )
 from app.services.inventory import (
     HouseholdNotFoundError,
-    InventoryItemAlreadyExistsError,
     InventoryItemNotFoundError,
     PlusPlanRequiredError,
     ProductNotFoundError,
@@ -61,11 +60,6 @@ def _consume_first_response(
 def _translate_inventory_error(exc: Exception) -> HTTPException:
     if isinstance(exc, ProductNotFoundError):
         return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    if isinstance(exc, InventoryItemAlreadyExistsError):
-        return HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Product already exists in this household inventory",
-        )
     if isinstance(exc, InventoryItemNotFoundError):
         return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Inventory item not found")
     if isinstance(exc, PlusPlanRequiredError):
@@ -79,7 +73,7 @@ def create_item(
 ) -> InventoryItemRead:
     try:
         item, product = create_inventory_item(db, current_user.id, data)
-    except (ProductNotFoundError, InventoryItemAlreadyExistsError, HouseholdNotFoundError) as exc:
+    except (ProductNotFoundError, HouseholdNotFoundError) as exc:
         raise _translate_inventory_error(exc) from None
     return _response(item, product)
 
