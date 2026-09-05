@@ -6,6 +6,7 @@ import {
   consumptionEventPayload,
   inventoryAfterConsumption
 } from "../frontend/consumption-actions.mjs";
+import { visibleInventoryItems } from "../frontend/expiry.mjs";
 
 
 test("priority cards expose the existing consumption event types", () => {
@@ -48,4 +49,25 @@ test("the shared inventory update keeps residual quantities and removes finished
   ]);
   assert.deepEqual(inventoryAfterConsumption(items, "item-2", 1), [items[0]]);
   assert.equal(inventoryAfterConsumption(items, "missing", 1), items);
+});
+
+test("all priority actions keep refreshed Consume First and Inventory projections coherent", () => {
+  const initial = [
+    { id: "milk", quantity: 2 },
+    { id: "yogurt", quantity: 1 },
+    { id: "pasta", quantity: 3 }
+  ];
+
+  for (const action of ["CONSUMED", "FINISHED", "DISCARDED"]) {
+    const quantity = action === "CONSUMED" ? 1 : 2;
+    const updatedInventory = inventoryAfterConsumption(initial, "milk", quantity);
+    const refreshedPriorities = action === "CONSUMED"
+      ? [updatedInventory[0], updatedInventory[1]]
+      : [updatedInventory[0]];
+
+    assert.deepEqual(
+      visibleInventoryItems("PLUS", updatedInventory, refreshedPriorities),
+      action === "CONSUMED" ? [updatedInventory[2]] : [updatedInventory[1]]
+    );
+  }
 });

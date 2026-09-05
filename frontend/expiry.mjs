@@ -32,3 +32,12 @@ export function partitionConsumeFirst(items) {
 export function planAllowsConsumeFirst(plan) {
   return plan === "PLUS";
 }
+
+export function visibleInventoryItems(plan, inventoryItems, consumeFirstItems) {
+  if (!planAllowsConsumeFirst(plan)) return inventoryItems;
+  const displayedPriorityIds = new Set(
+    consumeFirstItems.slice(0, 5).map((item) => String(item.id))
+  );
+  if (!displayedPriorityIds.size) return inventoryItems;
+  return inventoryItems.filter((item) => !displayedPriorityIds.has(String(item.id)));
+}

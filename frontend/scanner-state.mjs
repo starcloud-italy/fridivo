@@ -2,11 +2,19 @@ export const BARCODE_EXIT_GRACE_MS = 700;
 export const BARCODE_EXIT_MISSES = 3;
 export const SCANNER_STORAGE_LOCATIONS = ["fridge", "freezer", "pantry", "other"];
 
+export function normalizeBarcode(rawValue) {
+  return String(rawValue ?? "").trim();
+}
+
+export function isAcceptableBarcode(barcode) {
+  return /^\d{8,14}$/.test(barcode);
+}
+
 function normalizeBarcodes(rawValues) {
   return new Set(
     [...rawValues]
-      .map((value) => String(value || "").trim())
-      .filter((value) => /^\d{8,14}$/.test(value))
+      .map(normalizeBarcode)
+      .filter(isAcceptableBarcode)
   );
 }
 

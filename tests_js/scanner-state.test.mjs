@@ -6,6 +6,8 @@ import {
   BARCODE_EXIT_MISSES,
   BarcodePresenceTracker,
   addSessionUnit,
+  isAcceptableBarcode,
+  normalizeBarcode,
   sessionIsReadyToSave,
   setSessionItemExpiry,
   setSessionItemLocation
@@ -14,6 +16,20 @@ import {
 const A = "0801234567890";
 const B = "8001234567896";
 const productA = { barcode: A, name: "Baiocchi" };
+
+test("manual barcode normalization preserves leading zeroes", () => {
+  const barcode = normalizeBarcode("  0012345678905  ");
+  assert.equal(barcode, "0012345678905");
+  assert.equal(isAcceptableBarcode(barcode), true);
+});
+
+test("barcode validation matches the existing 8 to 14 digit lookup format", () => {
+  assert.equal(isAcceptableBarcode("12345678"), true);
+  assert.equal(isAcceptableBarcode("12345678901234"), true);
+  assert.equal(isAcceptableBarcode("1234567"), false);
+  assert.equal(isAcceptableBarcode("1234-5678"), false);
+  assert.equal(isAcceptableBarcode("123456789012345"), false);
+});
 
 function registerEntries(tracker, session, values, time, feedback) {
   const events = tracker.observe(values, time);

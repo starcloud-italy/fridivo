@@ -52,3 +52,12 @@ test("dynamic messages interpolate in the selected language", () => {
 test("product data passed into translations is preserved", () => {
   assert.match(translate("en", "scanner.scanned", { name: "Baiocchi Mulino Bianco", quantity: 1 }), /Baiocchi Mulino Bianco/);
 });
+
+test("manual barcode controls and validation are localized", () => {
+  assert.equal(translate("it", "barcode.enter"), "Inserisci barcode");
+  assert.equal(translate("en", "barcode.enter"), "Enter barcode");
+  assert.equal(translate("it", "barcode.label"), "Codice a barre");
+  assert.equal(translate("en", "barcode.label"), "Barcode");
+  assert.equal(translate("it", "barcode.find"), "Cerca prodotto");
+  assert.equal(translate("en", "barcode.find"), "Find product");
+});

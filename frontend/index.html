@@ -333,6 +333,19 @@
               <span><strong data-i18n="scanner.open">Scansiona barcode</strong><small data-i18n="scanner.openHint">Fotocamera continua per più prodotti</small></span>
               <span class="select-cue" aria-hidden="true">›</span>
             </button>
+            <details id="manual-barcode-disclosure" class="manual-barcode-disclosure">
+              <summary data-i18n="barcode.enter">Inserisci barcode</summary>
+              <form id="manual-barcode-form" class="manual-barcode-form" novalidate>
+                <label for="manual-barcode-input" data-i18n="barcode.label">Codice a barre</label>
+                <div class="manual-barcode-row">
+                  <input id="manual-barcode-input" name="barcode" type="text" inputmode="numeric" enterkeyhint="search" autocomplete="off" autocapitalize="off" spellcheck="false" minlength="8" maxlength="14" pattern="[0-9]{8,14}" aria-describedby="manual-barcode-error" />
+                  <button id="manual-barcode-submit" class="secondary-button" type="submit">
+                    <span data-i18n="barcode.find">Cerca prodotto</span><span class="button-spinner" aria-hidden="true"></span>
+                  </button>
+                </div>
+                <div id="manual-barcode-error" class="inline-message error" role="alert" hidden></div>
+              </form>
+            </details>
             <div class="manual-divider"><span data-i18n="search.manualDivider">oppure cerca manualmente</span></div>
             <form id="search-form" class="search-form" role="search">
               <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>

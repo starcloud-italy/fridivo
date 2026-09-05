@@ -99,6 +99,26 @@ def test_add_view_keeps_manual_search_and_exposes_multi_barcode_scanner(client):
     assert "oppure cerca manualmente" in html
 
 
+def test_add_view_exposes_a_localized_collapsible_manual_barcode_lookup(client):
+    html = client.get("/").text
+    script = client.get("/assets/app.js").text
+    translations = client.get("/assets/i18n.mjs").text
+
+    assert 'id="manual-barcode-disclosure"' in html
+    assert 'data-i18n="barcode.enter"' in html
+    assert 'id="manual-barcode-form"' in html
+    assert 'type="text" inputmode="numeric"' in html
+    assert 'pattern="[0-9]{8,14}"' in html
+    assert 'data-i18n="barcode.label"' in html
+    assert 'data-i18n="barcode.find"' in html
+    assert "normalizeBarcode(elements.manualBarcodeInput.value)" in script
+    assert "isAcceptableBarcode(barcode)" in script
+    assert "const product = await lookupBarcodeProduct(barcode)" in script
+    assert 'userMessage(error, "barcode")' in script
+    for key in ("barcode.enter", "barcode.label", "barcode.find", "barcode.validation"):
+        assert translations.count(f'"{key}"') == 2
+
+
 def test_scanner_has_camera_errors_continuous_session_and_finish_controls(client):
     html = client.get("/").text
     script = client.get("/assets/app.js").text
@@ -223,7 +243,7 @@ def test_inventory_management_patches_quantity_and_location_and_updates_ui(clien
     assert "quantity: inventoryEditQuantity" in script
     assert "storage_location: inventoryEditLocation" in script
     assert "inventoryItems = inventoryItems.map" in script
-    assert "renderInventory(inventoryItems)" in script
+    assert "renderInventoryWithPriorities()" in script
 
 
 def test_inventory_manual_removal_requires_confirmation_and_updates_ui(client):
@@ -524,6 +544,17 @@ def test_consume_first_ui_is_plan_aware_localized_and_semantically_separates_exp
         "consumeFirst.error",
     ):
         assert translations.count(f'"{key}"') == 2
+
+
+def test_inventory_rendering_excludes_only_displayed_plus_priorities(client):
+    script = client.get("/assets/app.js").text
+    expiry = client.get("/assets/expiry.mjs").text
+
+    assert "visibleInventoryItems(householdPlan, inventoryItems, consumeFirstItems)" in script
+    assert "consumeFirstItems.slice(0, 5)" in expiry
+    assert "!planAllowsConsumeFirst(plan)" in expiry
+    assert "displayedPriorityIds.has(String(item.id))" in expiry
+    assert "if (inventoryLoaded) renderInventoryWithPriorities()" in script
 
 
 def test_consume_first_cards_reuse_the_existing_consumption_flow(client):

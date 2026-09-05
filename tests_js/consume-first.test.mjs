@@ -4,7 +4,8 @@ import test from "node:test";
 import {
   expiryTiming,
   partitionConsumeFirst,
-  planAllowsConsumeFirst
+  planAllowsConsumeFirst,
+  visibleInventoryItems
 } from "../frontend/expiry.mjs";
 import { translate } from "../frontend/i18n.mjs";
 
@@ -53,4 +54,20 @@ test("consume-first and expiry copy is available in Italian and English", () => 
   assert.equal(translate("en", "expiry.inOneDay"), "Expires tomorrow");
   assert.equal(translate("it", "expiry.inDays", { days: 3 }), "Scade tra 3 giorni");
   assert.equal(translate("en", "expiry.inDays", { days: 3 }), "Expires in 3 days");
+});
+
+test("PLUS inventory hides only the five priority items actually displayed", () => {
+  const inventory = Array.from({ length: 7 }, (_, index) => ({ id: `item-${index + 1}` }));
+  const consumeFirst = inventory.slice(0, 6);
+
+  assert.deepEqual(
+    visibleInventoryItems("PLUS", inventory, consumeFirst),
+    [inventory[5], inventory[6]]
+  );
+});
+
+test("FREE inventory remains complete even when priority data is available", () => {
+  const inventory = [{ id: "priority" }, { id: "regular" }];
+
+  assert.equal(visibleInventoryItems("FREE", inventory, [inventory[0]]), inventory);
 });

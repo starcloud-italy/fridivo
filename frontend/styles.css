@@ -162,6 +162,17 @@ button.product-card:hover { border-color: rgba(63,107,87,.3); }
 .scanner-entry strong { font-size: 16px; }
 .scanner-entry small { margin-top: 3px; color: rgba(255,255,255,.76); font-size: 12px; }
 .scanner-entry .select-cue { color: white; }
+.manual-barcode-disclosure { margin-top: 7px; }
+.manual-barcode-disclosure > summary { display: flex; align-items: center; justify-content: center; min-height: 46px; border-radius: 13px; color: var(--green-dark); cursor: pointer; font-size: 14px; font-weight: 750; list-style: none; }
+.manual-barcode-disclosure > summary::-webkit-details-marker { display: none; }
+.manual-barcode-disclosure > summary::before { content: "#"; margin-right: 8px; color: var(--green); font-size: 17px; font-weight: 850; }
+.manual-barcode-disclosure > summary:hover { background: rgba(63,107,87,.06); }
+.manual-barcode-form { margin-top: 3px; border: 1px solid var(--border); border-radius: 16px; padding: 12px; background: white; }
+.manual-barcode-form > label { display: block; margin: 0 0 7px 2px; color: var(--ink); font-size: 13px; font-weight: 750; }
+.manual-barcode-row { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 8px; }
+.manual-barcode-row input { min-width: 0; min-height: 48px; font-variant-numeric: tabular-nums; letter-spacing: .04em; }
+.manual-barcode-row .secondary-button { min-height: 48px; padding-inline: 14px; white-space: nowrap; }
+.manual-barcode-form .inline-message { margin-top: 9px; }
 .manual-divider { display: flex; align-items: center; gap: 10px; margin: 20px 3px 14px; color: var(--muted); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
 .manual-divider::before, .manual-divider::after { content: ""; flex: 1; height: 1px; background: var(--border); }
 
@@ -387,6 +398,8 @@ body.scanner-open { overflow: hidden; }
   .fab { width: 52px; justify-content: center; padding: 0; }
   .fab > span:first-child { font-size: 28px; }
   .scanner-modal { padding-inline: 12px; }
+  .manual-barcode-row { grid-template-columns: 1fr; }
+  .manual-barcode-row .secondary-button { width: 100%; }
   .summary-item { grid-template-columns: 46px minmax(0,1fr) auto; gap: 8px; padding: 9px; }
   .summary-item .product-image { width: 46px; height: 46px; }
   .summary-controls { grid-template-columns: 35px 31px 35px; }
