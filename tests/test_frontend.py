@@ -1,4 +1,13 @@
+import re
+from pathlib import Path
+from tempfile import TemporaryDirectory
+
 import pytest
+
+from app.main import FRONTEND_ASSET_VERSION, _frontend_asset_version
+
+
+VERSIONED_ASSET_PREFIX = f"/assets/{FRONTEND_ASSET_VERSION}"
 
 
 def test_frontend_is_served_from_root(client):
@@ -6,6 +15,7 @@ def test_frontend_is_served_from_root(client):
 
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/html")
+    assert response.headers["cache-control"] == "no-cache"
     assert "La tua dispensa" in response.text
     assert "Aggiungi prodotto" in response.text
     assert "Registrati" in response.text
@@ -54,11 +64,86 @@ def test_frontend_assets_and_runtime_config_are_available(client):
     assert logo.headers["content-type"] == "image/png"
 
 
+def test_index_uses_one_release_namespace_for_all_static_assets(client):
+    response = client.get("/")
+    html = response.text
+
+    assert f'href="{VERSIONED_ASSET_PREFIX}/styles.css"' in html
+    assert f'src="{VERSIONED_ASSET_PREFIX}/app.js"' in html
+    assert f'src="{VERSIONED_ASSET_PREFIX}/vendor/zxing-browser-0.2.1.min.js"' in html
+    assert f'src="{VERSIONED_ASSET_PREFIX}/assets/fridivo-logo.png"' in html
+    assert 'src="/app-config.js"' in html
+    assert 'src="/assets/app.js"' not in html
+    assert 'href="/assets/styles.css"' not in html
+    asset_urls = re.findall(r'(?:src|href)="(/assets/[^\"]+)"', html)
+    assert asset_urls
+    assert all(url.startswith(f"{VERSIONED_ASSET_PREFIX}/") for url in asset_urls)
+
+
+def test_versioned_entrypoint_modules_and_css_are_immutable(client):
+    expected_cache_control = "public, max-age=31536000, immutable"
+
+    stylesheet = client.get(f"{VERSIONED_ASSET_PREFIX}/styles.css")
+    script = client.get(f"{VERSIONED_ASSET_PREFIX}/app.js")
+    scanner_state = client.get(f"{VERSIONED_ASSET_PREFIX}/scanner-state.mjs")
+
+    for response in (stylesheet, script, scanner_state):
+        assert response.status_code == 200
+        assert response.headers["cache-control"] == expected_cache_control
+    assert 'from "./scanner-state.mjs"' in script.text
+    assert "export function isAcceptableBarcode" in scanner_state.text
+    module_paths = re.findall(r'from "\./([^\"]+\.mjs)"', script.text)
+    assert "scanner-state.mjs" in module_paths
+    for module_path in module_paths:
+        module = client.get(f"{VERSIONED_ASSET_PREFIX}/{module_path}")
+        assert module.status_code == 200
+        assert module.headers["cache-control"] == expected_cache_control
+
+    revalidated = client.get(
+        f"{VERSIONED_ASSET_PREFIX}/app.js",
+        headers={"If-None-Match": script.headers["etag"]},
+    )
+    assert revalidated.status_code == 304
+    assert revalidated.headers["cache-control"] == expected_cache_control
+
+
+def test_frontend_asset_version_changes_with_asset_content():
+    with TemporaryDirectory(dir=Path.cwd()) as directory:
+        asset_dir = Path(directory)
+        asset = asset_dir / "app.js"
+        asset.write_text("export const release = 1;", encoding="utf-8")
+        first_version = _frontend_asset_version(asset_dir)
+
+        asset.write_text("export const release = 2;", encoding="utf-8")
+        second_version = _frontend_asset_version(asset_dir)
+
+    assert first_version != second_version
+    assert len(first_version) == len(second_version) == 16
+
+
+def test_legacy_assets_revalidate_and_wrong_release_paths_do_not_fall_back(client):
+    for path in ("app.js", "scanner-state.mjs", "styles.css"):
+        response = client.get(f"/assets/{path}")
+        assert response.status_code == 200
+        assert response.headers["cache-control"] == "no-cache"
+
+    assert client.get("/assets/not-the-current-release/app.js").status_code == 404
+
+
+def test_runtime_config_remains_unversioned_and_never_cached(client):
+    index = client.get("/").text
+    config = client.get("/app-config.js")
+
+    assert 'src="/app-config.js"' in index
+    assert config.status_code == 200
+    assert config.headers["cache-control"] == "no-store"
+
+
 def test_official_logo_replaces_placeholders_without_distortion(client):
     html = client.get("/").text
     stylesheet = client.get("/assets/styles.css").text
 
-    assert html.count('src="/assets/assets/fridivo-logo.png"') == 4
+    assert html.count(f'src="{VERSIONED_ASSET_PREFIX}/assets/fridivo-logo.png"') == 4
     assert 'class="boot-logo"' in html
     assert 'class="login-logo"' in html
     assert 'class="header-logo"' in html
