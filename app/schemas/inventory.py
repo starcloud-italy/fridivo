@@ -1,3 +1,4 @@
+import enum
 from datetime import date, datetime
 from typing import Self
 from uuid import UUID
@@ -43,3 +44,15 @@ class InventoryItemRead(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+
+class ExpiryStatus(str, enum.Enum):
+    EXPIRED = "EXPIRED"
+    TODAY = "TODAY"
+    TOMORROW = "TOMORROW"
+    FUTURE = "FUTURE"
+
+
+class ConsumeFirstItemRead(InventoryItemRead):
+    expiry_date: date
+    expiry_status: ExpiryStatus
+    days_until_expiry: int

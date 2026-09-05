@@ -1,9 +1,13 @@
 from datetime import datetime, timezone
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, exists, func, or_, select
 from sqlalchemy.orm import Session
 
+from app.models.consumption import ConsumptionEvent, ConsumptionEventType
+from app.models.household import HouseholdPlan
+from app.models.inventory import InventoryItem
+from app.models.product import CatalogProduct
 from app.models.shopping import ShoppingListItem
 from app.schemas.shopping import (
     ShoppingListItemCreate,
@@ -11,6 +15,7 @@ from app.schemas.shopping import (
     ShoppingListItemUpdate,
 )
 from app.services.household import get_current_household
+from app.services.products import get_products_by_barcodes
 
 
 class HouseholdNotFoundError(Exception):
@@ -18,6 +23,10 @@ class HouseholdNotFoundError(Exception):
 
 
 class ShoppingListItemNotFoundError(Exception):
+    pass
+
+
+class PlusPlanRequiredError(Exception):
     pass
 
 
@@ -103,6 +112,88 @@ def list_shopping_list_items(db: Session, user_id: UUID) -> list[ShoppingListIte
             )
         )
     )
+
+
+def _shopping_suggestion_statement(household_id: UUID):
+    latest_finished = (
+        select(
+            ConsumptionEvent.product_barcode.label("product_barcode"),
+            func.max(ConsumptionEvent.occurred_at).label("last_finished_at"),
+        )
+        .where(
+            ConsumptionEvent.household_id == household_id,
+            ConsumptionEvent.event_type == ConsumptionEventType.FINISHED,
+        )
+        .group_by(ConsumptionEvent.product_barcode)
+        .subquery()
+    )
+    currently_in_inventory = exists(
+        select(InventoryItem.id).where(
+            InventoryItem.household_id == household_id,
+            InventoryItem.product_barcode == latest_finished.c.product_barcode,
+        )
+    )
+    shopping_list_blocks_suggestion = exists(
+        select(ShoppingListItem.id).where(
+            ShoppingListItem.household_id == household_id,
+            ShoppingListItem.product_barcode == latest_finished.c.product_barcode,
+            or_(
+                ShoppingListItem.is_completed.is_(False),
+                and_(
+                    ShoppingListItem.is_completed.is_(True),
+                    ShoppingListItem.completed_at.is_not(None),
+                    ShoppingListItem.completed_at >= latest_finished.c.last_finished_at,
+                ),
+            ),
+        )
+    )
+    return (
+        select(latest_finished.c.product_barcode, latest_finished.c.last_finished_at)
+        .where(
+            ~currently_in_inventory,
+            ~shopping_list_blocks_suggestion,
+        )
+        .order_by(
+            latest_finished.c.last_finished_at.desc(),
+            latest_finished.c.product_barcode,
+        )
+    )
+
+
+def _displayable_suggestion_products(db: Session, rows) -> dict[str, CatalogProduct]:
+    products = get_products_by_barcodes(db, [row.product_barcode for row in rows])
+    return {
+        barcode: product
+        for barcode, product in products.items()
+        if product.name is not None and product.name.strip()
+    }
+
+
+def count_shopping_suggestion_candidates(db: Session, household_id: UUID) -> int:
+    """Count every displayable Module 8 candidate, before its display limit."""
+    rows = db.execute(_shopping_suggestion_statement(household_id)).all()
+    return len(_displayable_suggestion_products(db, rows))
+
+
+def list_shopping_suggestions(
+    db: Session, user_id: UUID
+) -> list[tuple[str, datetime, CatalogProduct]]:
+    result = get_current_household(db, user_id)
+    if result is None:
+        raise HouseholdNotFoundError
+    household, _membership = result
+    if household.plan != HouseholdPlan.PLUS:
+        raise PlusPlanRequiredError
+
+    rows = db.execute(_shopping_suggestion_statement(household.id).limit(5)).all()
+    products = _displayable_suggestion_products(db, rows)
+    return [
+        (row.product_barcode, row.last_finished_at, product)
+        for row in rows
+        if (product := products.get(row.product_barcode)) is not None
+        and product.name is not None
+        and product.name.strip()
+    ]
 
 
 def update_shopping_list_item(

@@ -135,6 +135,38 @@
               <span id="inventory-count" class="count-badge" hidden></span>
             </div>
 
+            <section id="consume-first-section" class="priority-section" aria-live="polite" hidden>
+              <div id="consume-first-loading" class="priority-loading" hidden>
+                <div class="priority-card skeleton-card"></div>
+              </div>
+              <div id="consume-first-error" class="priority-message" hidden>
+                <p data-i18n="consumeFirst.error">Non riusciamo a caricare le priorità.</p>
+              </div>
+              <div id="consume-first-empty" class="priority-message" hidden>
+                <p data-i18n="consumeFirst.empty">Aggiungi una scadenza ai prodotti per vedere le priorità.</p>
+              </div>
+              <div id="expired-priority-group" class="priority-group expired-priority" hidden>
+                <div class="priority-heading">
+                  <div>
+                    <p class="eyebrow" data-i18n="consumeFirst.attentionEyebrow">Richiedono attenzione</p>
+                    <h2 data-i18n="consumeFirst.expiredTitle">Scaduti · da verificare</h2>
+                  </div>
+                </div>
+                <p class="priority-note" data-i18n="consumeFirst.expiredNote">Verifica il prodotto prima di decidere cosa fare.</p>
+                <div id="expired-priority-list" class="priority-list"></div>
+              </div>
+              <div id="consume-priority-group" class="priority-group" hidden>
+                <div class="priority-heading">
+                  <div>
+                    <p class="eyebrow" data-i18n="consumeFirst.eyebrow">Priorità PLUS</p>
+                    <h2 data-i18n="consumeFirst.title">Da consumare prima</h2>
+                  </div>
+                  <span class="plus-badge">PLUS</span>
+                </div>
+                <div id="consume-priority-list" class="priority-list"></div>
+              </div>
+            </section>
+
             <div id="inventory-loading" class="card-list" aria-label="Caricamento dispensa" data-i18n-aria-label="inventory.loading" hidden>
               <div class="product-card skeleton-card"></div>
               <div class="product-card skeleton-card"></div>
@@ -208,7 +240,27 @@
               <h2 data-i18n="insights.noData">Nessun dato disponibile</h2>
               <p data-i18n="insights.empty">Non ci sono ancora dati di consumo sufficienti.</p>
             </div>
+            <section id="overview-section" class="overview" aria-labelledby="overview-title" hidden>
+              <div class="overview-heading">
+                <div>
+                  <h2 id="overview-title" data-i18n="overview.title">Il tuo andamento</h2>
+                  <p id="overview-period"></p>
+                </div>
+                <span class="plus-badge">PLUS</span>
+              </div>
+              <div id="overview-metrics" class="overview-metrics" aria-live="polite"></div>
+            </section>
             <div id="insights-content" aria-live="polite"></div>
+            <section id="waste-watch-section" class="waste-watch" aria-labelledby="waste-watch-title" hidden>
+              <div class="shopping-section-heading">
+                <div>
+                  <p class="eyebrow" data-i18n="wasteWatch.eyebrow">Pattern PLUS</p>
+                  <h2 id="waste-watch-title" data-i18n="wasteWatch.title">Sprechi da tenere d'occhio</h2>
+                </div>
+                <span class="plus-badge">PLUS</span>
+              </div>
+              <div id="waste-watch-list" class="waste-watch-list" aria-live="polite"></div>
+            </section>
           </section>
 
           <section id="shopping-view" class="view" aria-labelledby="shopping-title" hidden>
@@ -218,6 +270,16 @@
                 <h1 id="shopping-title" data-i18n="shopping.title">Lista della spesa</h1>
               </div>
             </div>
+            <section id="shopping-suggestions-section" class="shopping-suggestions" aria-labelledby="shopping-suggestions-title" hidden>
+              <div class="shopping-section-heading">
+                <div>
+                  <p class="eyebrow" data-i18n="shoppingSuggestions.eyebrow">Suggerimenti PLUS</p>
+                  <h2 id="shopping-suggestions-title" data-i18n="shoppingSuggestions.title">Potrebbero servirti</h2>
+                </div>
+                <span class="plus-badge">PLUS</span>
+              </div>
+              <div id="shopping-suggestions-list" class="shopping-suggestions-list" aria-live="polite"></div>
+            </section>
             <form id="shopping-quick-form" class="shopping-quick-form">
               <div class="shopping-quick-row">
                 <input id="shopping-name" name="name" maxlength="200" autocomplete="off" placeholder="Cosa devi comprare?" data-i18n-placeholder="shopping.namePlaceholder" aria-label="Nome" data-i18n-aria-label="shopping.name" required />

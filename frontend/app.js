@@ -7,6 +7,10 @@ import {
 } from "./scanner-state.mjs";
 import { resolveInitialLanguage, translate } from "./i18n.mjs";
 import { registrationPayload, registrationValidationKey } from "./registration.mjs";
+import { expiryTiming, partitionConsumeFirst, planAllowsConsumeFirst } from "./expiry.mjs";
+import { removeShoppingSuggestion, visibleShoppingSuggestions } from "./shopping-suggestions.mjs";
+import { visibleWasteWatch } from "./waste-watch.mjs";
+import { quantityKey, visibleOverview } from "./overview.mjs";
 
 const config = window.__FRIDIVO_CONFIG__ || {};
 const API_BASE_URL = String(config.apiBaseUrl || "").replace(/\/$/, "");
@@ -32,12 +36,17 @@ const elements = {
   registerForm: $("#register-form"), registerButton: $("#register-button"), registerError: $("#register-error"), registerDuplicateError: $("#register-duplicate-error"),
   inventoryView: $("#inventory-view"), searchView: $("#search-view"), historyView: $("#history-view"), insightsView: $("#insights-view"), shoppingView: $("#shopping-view"), inventoryList: $("#inventory-list"),
   inventoryLoading: $("#inventory-loading"), inventoryEmpty: $("#inventory-empty"), inventoryError: $("#inventory-error"),
+  consumeFirstSection: $("#consume-first-section"), consumeFirstLoading: $("#consume-first-loading"), consumeFirstEmpty: $("#consume-first-empty"), consumeFirstError: $("#consume-first-error"),
+  expiredPriorityGroup: $("#expired-priority-group"), expiredPriorityList: $("#expired-priority-list"), consumePriorityGroup: $("#consume-priority-group"), consumePriorityList: $("#consume-priority-list"),
   inventoryCount: $("#inventory-count"), fab: $("#fab-add"), searchForm: $("#search-form"),
   historyList: $("#history-list"), historyLoading: $("#history-loading"), historyEmpty: $("#history-empty"), historyError: $("#history-error"),
   insightsContent: $("#insights-content"), insightsLoading: $("#insights-loading"), insightsEmpty: $("#insights-empty"), insightsError: $("#insights-error"),
+  overviewSection: $("#overview-section"), overviewPeriod: $("#overview-period"), overviewMetrics: $("#overview-metrics"),
+  wasteWatchSection: $("#waste-watch-section"), wasteWatchList: $("#waste-watch-list"),
   shoppingQuickForm: $("#shopping-quick-form"), shoppingName: $("#shopping-name"), shoppingQuantity: $("#shopping-quantity"), shoppingNote: $("#shopping-note"), shoppingAdd: $("#shopping-add"), shoppingFormError: $("#shopping-form-error"),
   shoppingActiveSection: $("#shopping-active-section"), shoppingActiveList: $("#shopping-active-list"), shoppingActiveCount: $("#shopping-active-count"), shoppingCompletedSection: $("#shopping-completed-section"), shoppingCompletedList: $("#shopping-completed-list"), shoppingCompletedCount: $("#shopping-completed-count"),
   shoppingLoading: $("#shopping-loading"), shoppingEmpty: $("#shopping-empty"), shoppingError: $("#shopping-error"),
+  shoppingSuggestionsSection: $("#shopping-suggestions-section"), shoppingSuggestionsList: $("#shopping-suggestions-list"),
   searchInput: $("#search-input"), clearSearch: $("#clear-search"), searchResults: $("#search-results"),
   searchLoading: $("#search-loading"), searchEmpty: $("#search-empty"), searchError: $("#search-error"), searchWelcome: $("#search-welcome"),
   backdrop: $("#sheet-backdrop"), sheet: $("#add-sheet"), selectedProduct: $("#selected-product"),
@@ -63,12 +72,21 @@ let selectedProduct = null;
 let quantity = 1;
 let inventoryItems = [];
 let inventoryLoaded = false;
+let consumeFirstItems = [];
+let consumeFirstLoaded = false;
+let householdPlan = null;
 let historyItems = [];
 let historyLoaded = false;
 let insightsData = null;
 let insightsLoaded = false;
+let overviewData = null;
+let overviewLoaded = false;
+let wasteWatchItems = [];
+let wasteWatchLoaded = false;
 let shoppingItems = [];
 let shoppingLoaded = false;
+let shoppingSuggestions = [];
+let shoppingSuggestionsLoaded = false;
 let selectedShoppingItem = null;
 let searchResultItems = [];
 let selectedInventoryItem = null;
@@ -136,6 +154,19 @@ function setMessage(element, message = "") {
 
 function clearSession() {
   token = null;
+  householdPlan = null;
+  consumeFirstItems = [];
+  consumeFirstLoaded = false;
+  shoppingSuggestions = [];
+  shoppingSuggestionsLoaded = false;
+  wasteWatchItems = [];
+  wasteWatchLoaded = false;
+  overviewData = null;
+  overviewLoaded = false;
+  elements.consumeFirstSection.hidden = true;
+  elements.shoppingSuggestionsSection.hidden = true;
+  elements.wasteWatchSection.hidden = true;
+  elements.overviewSection.hidden = true;
   sessionStorage.removeItem(TOKEN_KEY);
 }
 
@@ -223,17 +254,73 @@ function applyStaticTranslations() {
   });
 }
 
-function expiryMeta(dateValue) {
+function expiryMeta(dateValue, knownStatus = null, knownDays = null) {
   if (!dateValue) return "";
-  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const timing = expiryTiming(dateValue);
+  if (!timing) return "";
   const expiry = new Date(`${dateValue}T00:00:00`);
-  const days = Math.round((expiry - today) / 86400000);
+  const status = knownStatus || timing.status;
+  const days = knownDays ?? timing.days;
   const formatted = new Intl.DateTimeFormat(locale(), { day: "numeric", month: "short" }).format(expiry);
-  if (days < 0) return `<span class="expiry expired">${escapeHtml(t("expiry.expired", { date: formatted }))}</span>`;
-  if (days === 0) return `<span class="expiry soon">${escapeHtml(t("expiry.today"))}</span>`;
-  if (days === 1) return `<span class="expiry soon">${escapeHtml(t("expiry.inOneDay"))}</span>`;
+  if (status === "EXPIRED") return `<span class="expiry expired">${escapeHtml(t("expiry.expired", { date: formatted }))}</span>`;
+  if (status === "TODAY") return `<span class="expiry soon">${escapeHtml(t("expiry.today"))}</span>`;
+  if (status === "TOMORROW") return `<span class="expiry soon">${escapeHtml(t("expiry.inOneDay"))}</span>`;
   if (days <= 7) return `<span class="expiry soon">${escapeHtml(t("expiry.inDays", { days }))}</span>`;
   return `<span class="expiry">${escapeHtml(t("expiry.on", { date: formatted }))}</span>`;
+}
+
+function priorityItemMarkup(item) {
+  return `<article class="priority-card">
+    ${productImage(item)}
+    <div class="product-info">
+      <h3 class="product-name">${escapeHtml(item.product_name || t("common.product"))}</h3>
+      ${item.brands ? `<p class="product-brand">${escapeHtml(item.brands)}</p>` : ""}
+      <div class="product-meta">
+        <span class="quantity-pill">${item.quantity} ${escapeHtml(t(item.quantity === 1 ? "common.piece" : "common.pieces"))}</span>
+        ${item.product_quantity ? `<span>${escapeHtml(item.product_quantity)}</span>` : ""}
+        <span>${escapeHtml(locationLabel(item.storage_location))}</span>
+        ${expiryMeta(item.expiry_date, item.expiry_status, item.days_until_expiry)}
+      </div>
+    </div>
+  </article>`;
+}
+
+function renderConsumeFirst(items) {
+  const groups = partitionConsumeFirst(items.slice(0, 5));
+  elements.consumeFirstSection.hidden = !planAllowsConsumeFirst(householdPlan);
+  elements.consumeFirstEmpty.hidden = items.length !== 0;
+  elements.expiredPriorityGroup.hidden = groups.expired.length === 0;
+  elements.consumePriorityGroup.hidden = groups.upcoming.length === 0;
+  elements.expiredPriorityList.innerHTML = groups.expired.map(priorityItemMarkup).join("");
+  elements.consumePriorityList.innerHTML = groups.upcoming.map(priorityItemMarkup).join("");
+}
+
+async function loadConsumeFirst() {
+  consumeFirstLoaded = false;
+  consumeFirstItems = [];
+  elements.consumeFirstSection.hidden = true;
+  elements.consumeFirstLoading.hidden = true;
+  elements.consumeFirstEmpty.hidden = true;
+  elements.consumeFirstError.hidden = true;
+  elements.expiredPriorityGroup.hidden = true;
+  elements.consumePriorityGroup.hidden = true;
+  try {
+    const household = await api("/api/v1/households/current");
+    householdPlan = household.plan;
+    if (!planAllowsConsumeFirst(householdPlan)) return;
+    elements.consumeFirstSection.hidden = false;
+    elements.consumeFirstLoading.hidden = false;
+    consumeFirstItems = await api("/api/v1/inventory/consume-first");
+    consumeFirstLoaded = true;
+    renderConsumeFirst(consumeFirstItems);
+  } catch (error) {
+    if (error.status !== 401 && error.status !== 403 && planAllowsConsumeFirst(householdPlan)) {
+      elements.consumeFirstSection.hidden = false;
+      elements.consumeFirstError.hidden = false;
+    }
+  } finally {
+    elements.consumeFirstLoading.hidden = true;
+  }
 }
 
 function renderInventory(items) {
@@ -269,15 +356,18 @@ async function loadInventory() {
   elements.inventoryError.hidden = true;
   elements.inventoryEmpty.hidden = true;
   elements.inventoryList.innerHTML = "";
+  let loaded = false;
   try {
     inventoryItems = await api("/api/v1/inventory");
     inventoryLoaded = true;
+    loaded = true;
     renderInventory(inventoryItems);
   } catch (error) {
     if (error.status !== 401) elements.inventoryError.hidden = false;
   } finally {
     elements.inventoryLoading.hidden = true;
   }
+  if (loaded) await loadConsumeFirst();
 }
 
 const consumptionTypeKeys = {
@@ -387,20 +477,127 @@ function renderInsights(data) {
     <section class="insight-section"><h2>${escapeHtml(t("insights.allProducts"))}</h2><div class="insight-details">${data.products.map(insightProductDetail).join("")}</div></section>`;
 }
 
+function overviewMetric(value, label) {
+  return `<div class="overview-metric"><strong>${escapeHtml(value)}</strong><span>${escapeHtml(label)}</span></div>`;
+}
+
+function renderOverview(data) {
+  const overview = visibleOverview(householdPlan, data);
+  elements.overviewSection.hidden = overview === null;
+  if (overview === null) {
+    elements.overviewMetrics.innerHTML = "";
+    return;
+  }
+  elements.overviewPeriod.textContent = t("overview.period", { count: overview.period.days });
+  const metrics = [
+    overviewMetric(
+      new Intl.NumberFormat(locale()).format(overview.used_quantity),
+      t(quantityKey("overview.used", overview.used_quantity))
+    ),
+    overviewMetric(
+      new Intl.NumberFormat(locale()).format(overview.discarded_quantity),
+      t(quantityKey("overview.discarded", overview.discarded_quantity))
+    ),
+    overview.waste_ratio === null ? "" : overviewMetric(
+      formatWasteRatio(overview.waste_ratio),
+      t("overview.wasteRatio")
+    ),
+    overviewMetric(
+      new Intl.NumberFormat(locale()).format(overview.repeated_waste_product_count),
+      t(quantityKey("overview.repeatedWaste", overview.repeated_waste_product_count))
+    ),
+    overviewMetric(
+      new Intl.NumberFormat(locale()).format(overview.repurchase_candidate_count),
+      t(quantityKey("overview.repurchase", overview.repurchase_candidate_count))
+    ),
+    overviewMetric(
+      new Intl.NumberFormat(locale()).format(overview.expiry_attention_product_count),
+      t(quantityKey("overview.expiry", overview.expiry_attention_product_count))
+    )
+  ];
+  elements.overviewMetrics.innerHTML = metrics.join("");
+}
+
+async function loadOverview() {
+  overviewLoaded = false;
+  overviewData = null;
+  elements.overviewSection.hidden = true;
+  try {
+    const household = await api("/api/v1/households/current");
+    householdPlan = household.plan;
+    if (householdPlan !== "PLUS") return;
+    overviewData = await api("/api/v1/insights/overview");
+    overviewLoaded = true;
+    renderOverview(overviewData);
+  } catch (error) {
+    if (error.status === 401) return;
+    elements.overviewSection.hidden = true;
+  }
+}
+
+function wasteWatchMarkup(item) {
+  const discardedKey = item.discarded_event_count === 1
+    ? "wasteWatch.discardedOne"
+    : "wasteWatch.discardedMany";
+  const quantityKey = item.discarded_quantity === 1
+    ? "wasteWatch.quantityOne"
+    : "wasteWatch.quantityMany";
+  return `<article class="waste-watch-item">
+    ${productImage(item)}
+    <div class="product-info">
+      <h3 class="product-name">${escapeHtml(item.product_name)}</h3>
+      ${item.brands ? `<p class="product-brand">${escapeHtml(item.brands)}</p>` : ""}
+      ${item.product_quantity ? `<div class="product-meta"><span>${escapeHtml(item.product_quantity)}</span></div>` : ""}
+      <p class="waste-watch-fact">${escapeHtml(t(discardedKey, { count: item.discarded_event_count }))}</p>
+      <p class="waste-watch-quantity">${escapeHtml(t(quantityKey, { count: item.discarded_quantity }))}</p>
+      <p class="waste-watch-suggestion">${escapeHtml(t("wasteWatch.suggestion"))}</p>
+    </div>
+  </article>`;
+}
+
+function renderWasteWatch(items) {
+  const visible = visibleWasteWatch(householdPlan, items);
+  elements.wasteWatchSection.hidden = visible.length === 0;
+  elements.wasteWatchList.innerHTML = visible.map(wasteWatchMarkup).join("");
+}
+
+async function loadWasteWatch() {
+  wasteWatchLoaded = false;
+  wasteWatchItems = [];
+  elements.wasteWatchSection.hidden = true;
+  try {
+    const household = await api("/api/v1/households/current");
+    householdPlan = household.plan;
+    if (householdPlan !== "PLUS") return;
+    wasteWatchItems = await api("/api/v1/insights/waste-watch");
+    wasteWatchLoaded = true;
+    renderWasteWatch(wasteWatchItems);
+  } catch (error) {
+    if (error.status === 401) return;
+    elements.wasteWatchSection.hidden = true;
+  }
+}
+
 async function loadInsights() {
   insightsLoaded = false;
   elements.insightsLoading.hidden = false;
   elements.insightsError.hidden = true;
   elements.insightsEmpty.hidden = true;
   elements.insightsContent.innerHTML = "";
+  let loaded = false;
   try {
     insightsData = await api("/api/v1/insights/consumption");
     insightsLoaded = true;
+    loaded = true;
     renderInsights(insightsData);
   } catch (error) {
     if (error.status !== 401) elements.insightsError.hidden = false;
   } finally {
     elements.insightsLoading.hidden = true;
+  }
+  if (loaded) {
+    await loadOverview();
+    await loadWasteWatch();
   }
 }
 
@@ -437,6 +634,41 @@ function renderShopping(items) {
   elements.shoppingCompletedSection.open = completedWasOpen;
 }
 
+function shoppingSuggestionMarkup(item) {
+  return `<article class="shopping-suggestion" data-shopping-suggestion-item="${escapeHtml(item.product_barcode)}">
+    ${productImage(item)}
+    <div class="product-info">
+      <h3 class="product-name">${escapeHtml(item.product_name)}</h3>
+      ${item.brands ? `<p class="product-brand">${escapeHtml(item.brands)}</p>` : ""}
+      ${item.product_quantity ? `<div class="product-meta"><span>${escapeHtml(item.product_quantity)}</span></div>` : ""}
+    </div>
+    <button class="shopping-suggestion-add" type="button" data-shopping-suggestion="${escapeHtml(item.product_barcode)}">${escapeHtml(t("shoppingSuggestions.add"))}</button>
+  </article>`;
+}
+
+function renderShoppingSuggestions(items) {
+  const visible = visibleShoppingSuggestions(householdPlan, items);
+  elements.shoppingSuggestionsSection.hidden = visible.length === 0;
+  elements.shoppingSuggestionsList.innerHTML = visible.map(shoppingSuggestionMarkup).join("");
+}
+
+async function loadShoppingSuggestions() {
+  shoppingSuggestionsLoaded = false;
+  shoppingSuggestions = [];
+  elements.shoppingSuggestionsSection.hidden = true;
+  try {
+    const household = await api("/api/v1/households/current");
+    householdPlan = household.plan;
+    if (householdPlan !== "PLUS") return;
+    shoppingSuggestions = await api("/api/v1/shopping-list/suggestions");
+    shoppingSuggestionsLoaded = true;
+    renderShoppingSuggestions(shoppingSuggestions);
+  } catch (error) {
+    if (error.status === 401) return;
+    elements.shoppingSuggestionsSection.hidden = true;
+  }
+}
+
 async function loadShopping() {
   shoppingLoaded = false;
   elements.shoppingLoading.hidden = false;
@@ -444,15 +676,18 @@ async function loadShopping() {
   elements.shoppingEmpty.hidden = true;
   elements.shoppingActiveSection.hidden = true;
   elements.shoppingCompletedSection.hidden = true;
+  let loaded = false;
   try {
     shoppingItems = await api("/api/v1/shopping-list");
     shoppingLoaded = true;
+    loaded = true;
     renderShopping(shoppingItems);
   } catch (error) {
     if (error.status !== 401) elements.shoppingError.hidden = false;
   } finally {
     elements.shoppingLoading.hidden = true;
   }
+  if (loaded) await loadShoppingSuggestions();
 }
 
 function showView(viewName) {
@@ -648,9 +883,13 @@ function showToast(message) {
 
 function refreshLocalizedView() {
   if (inventoryLoaded) renderInventory(inventoryItems);
+  if (consumeFirstLoaded) renderConsumeFirst(consumeFirstItems);
   if (historyLoaded) renderHistory(historyItems);
   if (insightsLoaded) renderInsights(insightsData);
+  if (overviewLoaded) renderOverview(overviewData);
+  if (wasteWatchLoaded) renderWasteWatch(wasteWatchItems);
   if (shoppingLoaded) renderShopping(shoppingItems);
+  if (shoppingSuggestionsLoaded) renderShoppingSuggestions(shoppingSuggestions);
   if (searchResultItems.length) renderSearchResults(searchResultItems);
   renderSelectedProduct();
   renderInventoryEditProduct();
@@ -1292,6 +1531,36 @@ elements.shoppingQuickForm.addEventListener("submit", async (event) => {
 });
 
 elements.shoppingView.addEventListener("click", async (event) => {
+  const suggestionButton = event.target.closest("[data-shopping-suggestion]");
+  if (suggestionButton) {
+    const suggestion = shoppingSuggestions.find(
+      (item) => item.product_barcode === suggestionButton.dataset.shoppingSuggestion
+    );
+    if (!suggestion) return;
+    suggestionButton.disabled = true;
+    try {
+      const saved = await api("/api/v1/shopping-list", {
+        method: "POST",
+        body: JSON.stringify({
+          product_barcode: suggestion.product_barcode,
+          name: suggestion.product_name
+        })
+      });
+      shoppingItems = [saved, ...shoppingItems.filter((item) => item.id !== saved.id)];
+      shoppingLoaded = true;
+      shoppingSuggestions = removeShoppingSuggestion(
+        shoppingSuggestions,
+        suggestion.product_barcode
+      );
+      renderShopping(shoppingItems);
+      renderShoppingSuggestions(shoppingSuggestions);
+      showToast(t("shoppingSuggestions.added"));
+    } catch (error) {
+      if (error.status !== 401) showToast(t("shoppingSuggestions.error"));
+      suggestionButton.disabled = false;
+    }
+    return;
+  }
   const editButton = event.target.closest("[data-shopping-edit]");
   if (editButton) {
     const item = shoppingItems.find((candidate) => candidate.id === editButton.dataset.shoppingEdit);
@@ -1445,6 +1714,7 @@ elements.inventoryEditForm.addEventListener("submit", async (event) => {
     });
     inventoryItems = inventoryItems.map((item) => item.id === updated.id ? updated : item);
     renderInventory(inventoryItems);
+    loadConsumeFirst();
     closeInventorySheet();
     showToast(t("success.inventoryUpdated"));
   } catch (error) {
@@ -1470,6 +1740,7 @@ $("#confirm-remove-inventory-item").addEventListener("click", async () => {
     await api(`/api/v1/inventory/${itemId}`, { method: "DELETE" });
     inventoryItems = inventoryItems.filter((item) => item.id !== itemId);
     renderInventory(inventoryItems);
+    loadConsumeFirst();
     closeInventorySheet();
     showToast(t("success.inventoryRemoved"));
   } catch (error) {

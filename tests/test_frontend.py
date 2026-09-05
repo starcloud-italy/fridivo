@@ -1,3 +1,6 @@
+import pytest
+
+
 def test_frontend_is_served_from_root(client):
     response = client.get("/")
 
@@ -14,6 +17,10 @@ def test_frontend_assets_and_runtime_config_are_available(client):
     scanner_state = client.get("/assets/scanner-state.mjs")
     registration = client.get("/assets/registration.mjs")
     i18n = client.get("/assets/i18n.mjs")
+    expiry = client.get("/assets/expiry.mjs")
+    shopping_suggestions = client.get("/assets/shopping-suggestions.mjs")
+    waste_watch = client.get("/assets/waste-watch.mjs")
+    overview = client.get("/assets/overview.mjs")
     zxing = client.get("/assets/vendor/zxing-browser-0.2.1.min.js")
     zxing_license = client.get("/assets/vendor/ZXING-LICENSE.txt")
     config = client.get("/app-config.js")
@@ -25,6 +32,10 @@ def test_frontend_assets_and_runtime_config_are_available(client):
     assert scanner_state.status_code == 200
     assert registration.status_code == 200
     assert i18n.status_code == 200
+    assert expiry.status_code == 200
+    assert shopping_suggestions.status_code == 200
+    assert waste_watch.status_code == 200
+    assert overview.status_code == 200
     assert "TRANSLATIONS" in i18n.text
     assert "class BarcodePresenceTracker" in scanner_state.text
     assert '"/api/v1/auth/login"' in script.text
@@ -485,3 +496,168 @@ def test_scanner_uses_individual_optional_expiry_dates(client):
     assert "scannedItem.expiryDate || null" in script
     assert "if (scannedItem.expiryDate) payload.expiry_date = scannedItem.expiryDate" in script
     assert "elements.confirmScanned.disabled = !sessionIsReadyToSave(scanSession)" in script
+
+
+def test_consume_first_ui_is_plan_aware_localized_and_semantically_separates_expired(client):
+    html = client.get("/").text
+    script = client.get("/assets/app.js").text
+    translations = client.get("/assets/i18n.mjs").text
+
+    assert 'id="consume-first-section"' in html
+    assert 'id="expired-priority-group"' in html
+    assert 'id="consume-priority-group"' in html
+    assert 'class="priority-group expired-priority"' in html
+    assert 'planAllowsConsumeFirst(householdPlan)' in script
+    assert 'api("/api/v1/households/current")' in script
+    assert 'api("/api/v1/inventory/consume-first")' in script
+    assert "items.slice(0, 5)" in script
+    assert 'item.expiry_status === "EXPIRED"' in client.get("/assets/expiry.mjs").text
+    for key in (
+        "consumeFirst.attentionEyebrow",
+        "consumeFirst.expiredTitle",
+        "consumeFirst.expiredNote",
+        "consumeFirst.eyebrow",
+        "consumeFirst.title",
+        "consumeFirst.empty",
+        "consumeFirst.error",
+    ):
+        assert translations.count(f'"{key}"') == 2
+
+
+@pytest.mark.parametrize("viewport_width", (375, 390, 430))
+def test_consume_first_mobile_layout_uses_shrinkable_columns_without_overflow(
+    client, viewport_width
+):
+    html = client.get("/").text
+    styles = client.get("/assets/styles.css").text
+
+    assert 'name="viewport"' in html
+    assert 'content="width=device-width, initial-scale=1, viewport-fit=cover"' in html
+    assert viewport_width >= 375
+    assert ".priority-section { display: grid;" in styles
+    assert ".priority-card { display: grid; grid-template-columns: 52px minmax(0,1fr);" in styles
+    assert ".priority-heading h2 { margin: 0; overflow-wrap: anywhere;" in styles
+    assert ".priority-list { display: grid; gap: 8px; min-width: 0; }" in styles
+
+
+def test_shopping_suggestions_are_plus_only_and_use_existing_shopping_api(client):
+    html = client.get("/").text
+    script = client.get("/assets/app.js").text
+    translations = client.get("/assets/i18n.mjs").text
+    suggestion_helpers = client.get("/assets/shopping-suggestions.mjs").text
+
+    assert 'id="shopping-suggestions-section"' in html
+    assert 'id="shopping-suggestions-list"' in html
+    assert 'api("/api/v1/shopping-list/suggestions")' in script
+    assert 'api("/api/v1/shopping-list", {' in script
+    assert 'data-shopping-suggestion="${escapeHtml(item.product_barcode)}"' in script
+    assert "removeShoppingSuggestion(" in script
+    assert 'plan === "PLUS" ? suggestions.slice(0, 5) : []' in suggestion_helpers
+    for key in (
+        "shoppingSuggestions.eyebrow",
+        "shoppingSuggestions.title",
+        "shoppingSuggestions.add",
+        "shoppingSuggestions.added",
+        "shoppingSuggestions.error",
+    ):
+        assert translations.count(f'"{key}"') == 2
+
+
+@pytest.mark.parametrize("viewport_width", (375, 390, 430))
+def test_shopping_suggestions_mobile_layout_has_no_fixed_width_overflow(
+    client, viewport_width
+):
+    styles = client.get("/assets/styles.css").text
+
+    assert viewport_width >= 375
+    assert ".shopping-suggestions { min-width: 0;" in styles
+    assert ".shopping-suggestions-list { display: grid; gap: 8px; min-width: 0; }" in styles
+    assert "grid-template-columns: 48px minmax(0,1fr);" in styles
+    assert ".shopping-suggestion-add { grid-column: 1 / -1;" in styles
+    assert "width: 100%;" in styles
+
+
+def test_waste_watch_ui_is_plus_only_cautious_localized_and_has_no_empty_panel(client):
+    html = client.get("/").text
+    script = client.get("/assets/app.js").text
+    translations = client.get("/assets/i18n.mjs").text
+    helper = client.get("/assets/waste-watch.mjs").text
+
+    assert 'id="waste-watch-section"' in html
+    assert 'id="waste-watch-list"' in html
+    assert 'api("/api/v1/insights/waste-watch")' in script
+    assert "visible.length === 0" in script
+    assert 'plan === "PLUS" ? items.slice(0, 5) : []' in helper
+    assert "item.discarded_event_count === 1" in script
+    assert "item.discarded_quantity === 1" in script
+    assert 't("wasteWatch.suggestion")' in script
+    for key in (
+        "wasteWatch.eyebrow",
+        "wasteWatch.title",
+        "wasteWatch.discardedOne",
+        "wasteWatch.discardedMany",
+        "wasteWatch.quantityOne",
+        "wasteWatch.quantityMany",
+        "wasteWatch.suggestion",
+    ):
+        assert translations.count(f'"{key}"') == 2
+
+
+@pytest.mark.parametrize("viewport_width", (375, 390, 430))
+def test_waste_watch_mobile_layout_uses_shrinkable_columns_without_overflow(
+    client, viewport_width
+):
+    styles = client.get("/assets/styles.css").text
+
+    assert viewport_width >= 375
+    assert ".waste-watch { min-width: 0;" in styles
+    assert ".waste-watch-list { display: grid; gap: 8px; min-width: 0; }" in styles
+    assert ".waste-watch-item { display: grid; grid-template-columns: 52px minmax(0,1fr);" in styles
+    assert "overflow-wrap: anywhere; font-size: 12px;" in styles
+
+
+def test_overview_ui_is_plus_only_localized_and_handles_null_ratio(client):
+    html = client.get("/").text
+    script = client.get("/assets/app.js").text
+    translations = client.get("/assets/i18n.mjs").text
+    helper = client.get("/assets/overview.mjs").text
+
+    assert 'id="overview-section"' in html
+    assert 'id="overview-period"' in html
+    assert 'id="overview-metrics"' in html
+    assert 'api("/api/v1/insights/overview")' in script
+    assert 'householdPlan !== "PLUS"' in script
+    assert 'overview.waste_ratio === null ? ""' in script
+    assert 'visibleOverview(plan, overview)' in helper
+    for key in (
+        "overview.title",
+        "overview.period",
+        "overview.usedOne",
+        "overview.usedMany",
+        "overview.discardedOne",
+        "overview.discardedMany",
+        "overview.wasteRatio",
+        "overview.repeatedWasteOne",
+        "overview.repeatedWasteMany",
+        "overview.repurchaseOne",
+        "overview.repurchaseMany",
+        "overview.expiryOne",
+        "overview.expiryMany",
+    ):
+        assert translations.count(f'"{key}"') == 2
+    assert "Il tuo andamento" in translations
+    assert "Your overview" in translations
+    assert "Ultimi {count} giorni" in translations
+    assert "Last {count} days" in translations
+
+
+@pytest.mark.parametrize("width", [375, 390, 430])
+def test_overview_mobile_layout_is_compact_and_avoids_overflow(client, width):
+    styles = client.get("/assets/styles.css").text
+
+    assert width >= 375
+    assert ".overview { min-width: 0;" in styles
+    assert ".overview-metrics { display: grid; grid-template-columns: repeat(2, minmax(0,1fr));" in styles
+    assert ".overview-metric { display: grid;" in styles
+    assert ".overview-metric span { overflow-wrap: anywhere;" in styles
+    assert ".waste-watch { min-width: 0;" in styles

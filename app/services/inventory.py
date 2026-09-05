@@ -1,12 +1,15 @@
+from datetime import date, datetime
 from uuid import UUID
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.models.household import HouseholdPlan
 from app.models.inventory import InventoryItem
 from app.models.product import CatalogProduct
-from app.schemas.inventory import InventoryItemCreate, InventoryItemUpdate
+from app.schemas.inventory import ExpiryStatus, InventoryItemCreate, InventoryItemUpdate
 from app.services.household import get_current_household
 from app.services.products import get_product_by_barcode, get_products_by_barcodes
 
@@ -24,6 +27,10 @@ class InventoryItemNotFoundError(Exception):
 
 
 class InventoryItemAlreadyExistsError(Exception):
+    pass
+
+
+class PlusPlanRequiredError(Exception):
     pass
 
 
@@ -96,6 +103,79 @@ def list_inventory_items(
     return [(item, products.get(item.product_barcode)) for item in items]
 
 
+def _today_for_household(timezone_name: str) -> date:
+    try:
+        timezone = ZoneInfo(timezone_name)
+    except ZoneInfoNotFoundError:
+        timezone = ZoneInfo("UTC")
+    return datetime.now(timezone).date()
+
+
+def _expiry_status(expiry_date: date, today: date) -> ExpiryStatus:
+    days_until_expiry = (expiry_date - today).days
+    if days_until_expiry < 0:
+        return ExpiryStatus.EXPIRED
+    if days_until_expiry == 0:
+        return ExpiryStatus.TODAY
+    if days_until_expiry == 1:
+        return ExpiryStatus.TOMORROW
+    return ExpiryStatus.FUTURE
+
+
+def list_consume_first_items(
+    db: Session, user_id: UUID
+) -> list[tuple[InventoryItem, CatalogProduct | None, ExpiryStatus, int]]:
+    result = get_current_household(db, user_id)
+    if result is None:
+        raise HouseholdNotFoundError
+    household, _membership = result
+    if household.plan != HouseholdPlan.PLUS:
+        raise PlusPlanRequiredError
+
+    items = list(
+        db.scalars(
+            select(InventoryItem)
+            .where(
+                InventoryItem.household_id == household.id,
+                InventoryItem.expiry_date.is_not(None),
+            )
+            .order_by(
+                InventoryItem.expiry_date,
+                InventoryItem.product_barcode,
+                InventoryItem.id,
+            )
+            .limit(5)
+        )
+    )
+    products = get_products_by_barcodes(db, [item.product_barcode for item in items])
+    today = _today_for_household(household.timezone)
+    return [
+        (
+            item,
+            products.get(item.product_barcode),
+            _expiry_status(item.expiry_date, today),
+            (item.expiry_date - today).days,
+        )
+        for item in items
+        if item.expiry_date is not None
+    ]
+
+
+def count_expiry_attention_items(db: Session, household_id: UUID) -> int:
+    """Count every item eligible for Consume First, before its display limit."""
+    return int(
+        db.scalar(
+            select(func.count())
+            .select_from(InventoryItem)
+            .where(
+                InventoryItem.household_id == household_id,
+                InventoryItem.expiry_date.is_not(None),
+            )
+        )
+        or 0
+    )
+
+
 def update_inventory_item(
     db: Session, user_id: UUID, item_id: UUID, data: InventoryItemUpdate
 ) -> tuple[InventoryItem, CatalogProduct | None]:
@@ -111,4 +191,3 @@ def delete_inventory_item(db: Session, user_id: UUID, item_id: UUID) -> None:
     item = _owned_item(db, user_id, item_id)
     db.delete(item)
     db.commit()
-

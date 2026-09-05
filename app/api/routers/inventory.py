@@ -5,15 +5,23 @@ from fastapi import APIRouter, HTTPException, Response, status
 from app.api.dependencies import CurrentUser, DbSession
 from app.models.inventory import InventoryItem
 from app.models.product import CatalogProduct
-from app.schemas.inventory import InventoryItemCreate, InventoryItemRead, InventoryItemUpdate
+from app.schemas.inventory import (
+    ConsumeFirstItemRead,
+    ExpiryStatus,
+    InventoryItemCreate,
+    InventoryItemRead,
+    InventoryItemUpdate,
+)
 from app.services.inventory import (
     HouseholdNotFoundError,
     InventoryItemAlreadyExistsError,
     InventoryItemNotFoundError,
+    PlusPlanRequiredError,
     ProductNotFoundError,
     create_inventory_item,
     delete_inventory_item,
     list_inventory_items,
+    list_consume_first_items,
     update_inventory_item,
 )
 
@@ -37,6 +45,19 @@ def _response(item: InventoryItem, product: CatalogProduct | None) -> InventoryI
     )
 
 
+def _consume_first_response(
+    item: InventoryItem,
+    product: CatalogProduct | None,
+    expiry_status: ExpiryStatus,
+    days_until_expiry: int,
+) -> ConsumeFirstItemRead:
+    return ConsumeFirstItemRead(
+        **_response(item, product).model_dump(),
+        expiry_status=expiry_status,
+        days_until_expiry=days_until_expiry,
+    )
+
+
 def _translate_inventory_error(exc: Exception) -> HTTPException:
     if isinstance(exc, ProductNotFoundError):
         return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
@@ -47,6 +68,8 @@ def _translate_inventory_error(exc: Exception) -> HTTPException:
         )
     if isinstance(exc, InventoryItemNotFoundError):
         return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Inventory item not found")
+    if isinstance(exc, PlusPlanRequiredError):
+        return HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="PLUS plan required")
     return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Household not found")
 
 
@@ -70,6 +93,20 @@ def list_items(db: DbSession, current_user: CurrentUser) -> list[InventoryItemRe
     return [_response(item, product) for item, product in items]
 
 
+@router.get("/consume-first", response_model=list[ConsumeFirstItemRead])
+def consume_first_items(
+    db: DbSession, current_user: CurrentUser
+) -> list[ConsumeFirstItemRead]:
+    try:
+        items = list_consume_first_items(db, current_user.id)
+    except (HouseholdNotFoundError, PlusPlanRequiredError) as exc:
+        raise _translate_inventory_error(exc) from None
+    return [
+        _consume_first_response(item, product, expiry_status, days_until_expiry)
+        for item, product, expiry_status, days_until_expiry in items
+    ]
+
+
 @router.patch("/{item_id}", response_model=InventoryItemRead)
 def update_item(
     item_id: UUID,
@@ -91,4 +128,3 @@ def delete_item(item_id: UUID, db: DbSession, current_user: CurrentUser) -> Resp
     except (InventoryItemNotFoundError, HouseholdNotFoundError) as exc:
         raise _translate_inventory_error(exc) from None
     return Response(status_code=status.HTTP_204_NO_CONTENT)
-

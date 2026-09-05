@@ -9,13 +9,16 @@ from app.schemas.shopping import (
     ShoppingListItemRead,
     ShoppingListItemStatusUpdate,
     ShoppingListItemUpdate,
+    ShoppingSuggestionRead,
 )
 from app.services.shopping import (
     HouseholdNotFoundError,
+    PlusPlanRequiredError,
     ShoppingListItemNotFoundError,
     create_shopping_list_item,
     delete_shopping_list_item,
     list_shopping_list_items,
+    list_shopping_suggestions,
     update_shopping_list_item,
     update_shopping_list_item_status,
 )
@@ -54,6 +57,32 @@ def list_items(db: DbSession, current_user: CurrentUser) -> list[ShoppingListIte
     except HouseholdNotFoundError:
         raise _not_found() from None
     return [_response(item) for item in items]
+
+
+@router.get("/suggestions", response_model=list[ShoppingSuggestionRead])
+def list_suggestions(
+    db: DbSession, current_user: CurrentUser
+) -> list[ShoppingSuggestionRead]:
+    try:
+        suggestions = list_shopping_suggestions(db, current_user.id)
+    except PlusPlanRequiredError:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="PLUS plan required",
+        ) from None
+    except HouseholdNotFoundError:
+        raise _not_found() from None
+    return [
+        ShoppingSuggestionRead(
+            product_barcode=barcode,
+            product_name=product.name,
+            brands=product.brands,
+            product_quantity=product.quantity,
+            image_url=product.image_url,
+            last_finished_at=last_finished_at,
+        )
+        for barcode, last_finished_at, product in suggestions
+    ]
 
 
 @router.patch("/{item_id}", response_model=ShoppingListItemRead)

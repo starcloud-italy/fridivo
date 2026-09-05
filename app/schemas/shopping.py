@@ -70,3 +70,12 @@ class ShoppingListItemRead(BaseModel):
     is_completed: bool
     created_at: datetime
     completed_at: datetime | None
+
+
+class ShoppingSuggestionRead(BaseModel):
+    product_barcode: str
+    product_name: str
+    brands: str | None
+    product_quantity: str | None
+    image_url: str | None
+    last_finished_at: datetime
