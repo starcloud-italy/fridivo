@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -12,6 +12,12 @@ class Settings(BaseSettings):
         default=30, gt=0, validation_alias="ACCESS_TOKEN_EXPIRE_MINUTES"
     )
     frontend_api_base_url: str = Field(default="", validation_alias="FRONTEND_API_BASE_URL")
+    stripe_secret_key: SecretStr | None = Field(
+        default=None, validation_alias="STRIPE_SECRET_KEY"
+    )
+    stripe_plus_monthly_price_id: str | None = Field(
+        default=None, validation_alias="STRIPE_PLUS_MONTHLY_PRICE_ID"
+    )
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

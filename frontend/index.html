@@ -132,7 +132,13 @@
                 <p class="eyebrow" data-i18n="inventory.eyebrow">A colpo d’occhio</p>
                 <h1 id="inventory-title" data-i18n="inventory.title">La tua dispensa</h1>
               </div>
-              <span id="inventory-count" class="count-badge" hidden></span>
+              <div class="inventory-heading-actions">
+                <button id="upgrade-plus" class="upgrade-button" type="button" hidden>
+                  <span data-i18n="billing.upgrade">Passa a Plus</span>
+                  <span class="button-spinner" aria-hidden="true"></span>
+                </button>
+                <span id="inventory-count" class="count-badge" hidden></span>
+              </div>
             </div>
 
             <section id="consume-first-section" class="priority-section" aria-live="polite" hidden>

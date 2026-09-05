@@ -45,7 +45,7 @@ const elements = {
   inventoryLoading: $("#inventory-loading"), inventoryEmpty: $("#inventory-empty"), inventoryError: $("#inventory-error"),
   consumeFirstSection: $("#consume-first-section"), consumeFirstLoading: $("#consume-first-loading"), consumeFirstEmpty: $("#consume-first-empty"), consumeFirstError: $("#consume-first-error"),
   expiredPriorityGroup: $("#expired-priority-group"), expiredPriorityList: $("#expired-priority-list"), consumePriorityGroup: $("#consume-priority-group"), consumePriorityList: $("#consume-priority-list"),
-  inventoryCount: $("#inventory-count"), fab: $("#fab-add"), searchForm: $("#search-form"),
+  inventoryCount: $("#inventory-count"), upgradePlus: $("#upgrade-plus"), fab: $("#fab-add"), searchForm: $("#search-form"),
   historyList: $("#history-list"), historyLoading: $("#history-loading"), historyEmpty: $("#history-empty"), historyError: $("#history-error"),
   insightsContent: $("#insights-content"), insightsLoading: $("#insights-loading"), insightsEmpty: $("#insights-empty"), insightsError: $("#insights-error"),
   overviewSection: $("#overview-section"), overviewPeriod: $("#overview-period"), overviewMetrics: $("#overview-metrics"),
@@ -176,6 +176,7 @@ function clearSession() {
   elements.shoppingSuggestionsSection.hidden = true;
   elements.wasteWatchSection.hidden = true;
   elements.overviewSection.hidden = true;
+  elements.upgradePlus.hidden = true;
   sessionStorage.removeItem(TOKEN_KEY);
 }
 
@@ -206,7 +207,29 @@ function showApp() {
   elements.login.hidden = true;
   elements.register.hidden = true;
   elements.authenticated.hidden = false;
+  loadUpgradeAvailability();
   showView("inventory");
+  showCheckoutReturnMessage();
+}
+
+async function loadUpgradeAvailability() {
+  elements.upgradePlus.hidden = true;
+  try {
+    const household = await api("/api/v1/households/current");
+    householdPlan = household.plan;
+    elements.upgradePlus.hidden = householdPlan !== "FREE";
+  } catch (error) {
+    if (error.status !== 401) elements.upgradePlus.hidden = true;
+  }
+}
+
+function showCheckoutReturnMessage() {
+  const url = new URL(window.location.href);
+  const checkoutStatus = url.searchParams.get("checkout");
+  if (!checkoutStatus) return;
+  url.searchParams.delete("checkout");
+  window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+  if (checkoutStatus === "success") showToast(t("billing.checkoutPending"));
 }
 
 function userMessage(error, context) {
@@ -1309,6 +1332,19 @@ async function saveScannedItem(scannedItem) {
     })
   });
 }
+
+elements.upgradePlus.addEventListener("click", async () => {
+  if (elements.upgradePlus.disabled) return;
+  setLoading(elements.upgradePlus, true);
+  try {
+    const checkout = await api("/api/v1/billing/checkout", { method: "POST" });
+    window.location.assign(checkout.url);
+  } catch (error) {
+    if (error.status !== 401) showToast(t("billing.checkoutError"));
+    if (error.status === 409) elements.upgradePlus.hidden = true;
+    setLoading(elements.upgradePlus, false);
+  }
+});
 
 elements.loginForm.addEventListener("submit", async (event) => {
   event.preventDefault();

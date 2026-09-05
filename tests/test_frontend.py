@@ -60,6 +60,7 @@ def test_frontend_assets_and_runtime_config_are_available(client):
     assert config.status_code == 200
     assert config.headers["cache-control"] == "no-store"
     assert '"apiBaseUrl": ""' in config.text
+    assert "stripe" not in config.text.lower()
     assert logo.status_code == 200
     assert logo.headers["content-type"] == "image/png"
 
@@ -171,6 +172,35 @@ def test_frontend_contains_accessible_mobile_controls(client):
     assert 'aria-modal="true"' in html
     assert "font-size: 16px" in stylesheet
     assert "min-height: 44px" in stylesheet
+
+
+def test_free_household_upgrade_uses_checkout_and_prevents_double_tap(client):
+    html = client.get("/").text
+    script = client.get("/assets/app.js").text
+    stylesheet = client.get("/assets/styles.css").text
+
+    assert 'id="upgrade-plus"' in html
+    assert 'data-i18n="billing.upgrade"' in html
+    assert "Passa a Plus" in html
+    assert 'elements.upgradePlus.hidden = householdPlan !== "FREE"' in script
+    assert 'if (elements.upgradePlus.disabled) return;' in script
+    assert "setLoading(elements.upgradePlus, true)" in script
+    assert 'api("/api/v1/billing/checkout", { method: "POST" })' in script
+    assert "window.location.assign(checkout.url)" in script
+    assert ".upgrade-button" in stylesheet
+    assert "min-height: 44px" in stylesheet
+
+
+def test_plus_upgrade_copy_and_checkout_return_are_localized(client):
+    translations = client.get("/assets/i18n.mjs").text
+    script = client.get("/assets/app.js").text
+
+    assert '"billing.upgrade": "Passa a Plus"' in translations
+    assert '"billing.upgrade": "Upgrade to Plus"' in translations
+    assert "Pagamento ricevuto. Stiamo verificando il tuo abbonamento." in translations
+    assert "Payment received. We’re verifying your subscription." in translations
+    assert 'showToast(t("billing.checkoutPending"))' in script
+    assert 'elements.upgradePlus.hidden = true' in script
 
 
 def test_add_view_keeps_manual_search_and_exposes_multi_barcode_scanner(client):

@@ -87,6 +87,11 @@ button:disabled { cursor: wait; opacity: .68; }
 .page-heading h1 { font-size: clamp(29px, 8vw, 38px); }
 .compact-heading { margin-bottom: 18px; }
 .count-badge { flex: none; margin-bottom: 3px; border-radius: 999px; padding: 7px 10px; background: #e8efe6; color: var(--green); font-size: 12px; font-weight: 750; }
+.inventory-heading-actions { display: flex; flex: none; flex-direction: column; align-items: end; gap: 6px; }
+.upgrade-button { min-height: 44px; border: 1px solid rgba(63,107,87,.22); border-radius: 999px; padding: 0 13px; background: rgba(255,255,255,.72); color: var(--green-dark); font-size: 12px; font-weight: 800; white-space: nowrap; }
+.upgrade-button:hover { background: #edf3ec; }
+.upgrade-button:focus-visible { outline: 3px solid rgba(121,168,107,.3); outline-offset: 2px; }
+.upgrade-button .button-spinner { border-color: rgba(63,107,87,.3); border-top-color: var(--green); }
 
 .priority-section { display: grid; gap: 14px; min-width: 0; margin: 0 0 24px; }
 .priority-group { min-width: 0; border: 1px solid rgba(63,107,87,.13); border-radius: 20px; padding: 15px; background: #f0f5ed; box-shadow: 0 7px 24px rgba(42,70,57,.055); }

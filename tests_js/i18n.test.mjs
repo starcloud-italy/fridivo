@@ -61,3 +61,16 @@ test("manual barcode controls and validation are localized", () => {
   assert.equal(translate("it", "barcode.find"), "Cerca prodotto");
   assert.equal(translate("en", "barcode.find"), "Find product");
 });
+
+test("Plus checkout copy is localized without treating the return as activation", () => {
+  assert.equal(translate("it", "billing.upgrade"), "Passa a Plus");
+  assert.equal(translate("en", "billing.upgrade"), "Upgrade to Plus");
+  assert.equal(
+    translate("it", "billing.checkoutPending"),
+    "Pagamento ricevuto. Stiamo verificando il tuo abbonamento."
+  );
+  assert.equal(
+    translate("en", "billing.checkoutPending"),
+    "Payment received. We’re verifying your subscription."
+  );
+});
