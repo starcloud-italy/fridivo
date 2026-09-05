@@ -21,6 +21,7 @@ def test_frontend_assets_and_runtime_config_are_available(client):
     shopping_suggestions = client.get("/assets/shopping-suggestions.mjs")
     waste_watch = client.get("/assets/waste-watch.mjs")
     overview = client.get("/assets/overview.mjs")
+    consumption_actions = client.get("/assets/consumption-actions.mjs")
     zxing = client.get("/assets/vendor/zxing-browser-0.2.1.min.js")
     zxing_license = client.get("/assets/vendor/ZXING-LICENSE.txt")
     config = client.get("/app-config.js")
@@ -36,6 +37,7 @@ def test_frontend_assets_and_runtime_config_are_available(client):
     assert shopping_suggestions.status_code == 200
     assert waste_watch.status_code == 200
     assert overview.status_code == 200
+    assert consumption_actions.status_code == 200
     assert "TRANSLATIONS" in i18n.text
     assert "class BarcodePresenceTracker" in scanner_state.text
     assert '"/api/v1/auth/login"' in script.text
@@ -524,6 +526,30 @@ def test_consume_first_ui_is_plan_aware_localized_and_semantically_separates_exp
         assert translations.count(f'"{key}"') == 2
 
 
+def test_consume_first_cards_reuse_the_existing_consumption_flow(client):
+    script = client.get("/assets/app.js").text
+    actions = client.get("/assets/consumption-actions.mjs").text
+    translations = client.get("/assets/i18n.mjs").text
+
+    assert 'data-priority-consumption="${action.type}"' in script
+    assert 'data-priority-item-id="${escapeHtml(item.id)}"' in script
+    assert "CONSUMPTION_ACTIONS.map" in script
+    assert "openInventorySheet(item, action, action.dataset.priorityConsumption)" in script
+    assert "consumptionEventPayload(item.id, eventType, consumptionQuantity)" in script
+    assert "inventoryAfterConsumption(" in script
+    assert 'api("/api/v1/consumption-events", {' in script
+    assert "await loadConsumeFirst()" in script
+    assert actions.count('type: "CONSUMED"') == 1
+    assert actions.count('type: "FINISHED"') == 1
+    assert actions.count('type: "DISCARDED"') == 1
+    for key in (
+        "consumption.consumed",
+        "consumption.finished",
+        "consumption.discarded",
+    ):
+        assert translations.count(f'"{key}"') == 2
+
+
 @pytest.mark.parametrize("viewport_width", (375, 390, 430))
 def test_consume_first_mobile_layout_uses_shrinkable_columns_without_overflow(
     client, viewport_width
@@ -538,6 +564,9 @@ def test_consume_first_mobile_layout_uses_shrinkable_columns_without_overflow(
     assert ".priority-card { display: grid; grid-template-columns: 52px minmax(0,1fr);" in styles
     assert ".priority-heading h2 { margin: 0; overflow-wrap: anywhere;" in styles
     assert ".priority-list { display: grid; gap: 8px; min-width: 0; }" in styles
+    assert ".priority-actions { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, minmax(0,1fr));" in styles
+    assert ".priority-action { display: inline-flex;" in styles
+    assert "min-height: 44px;" in styles
 
 
 def test_shopping_suggestions_are_plus_only_and_use_existing_shopping_api(client):

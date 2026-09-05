@@ -11,6 +11,11 @@ import { expiryTiming, partitionConsumeFirst, planAllowsConsumeFirst } from "./e
 import { removeShoppingSuggestion, visibleShoppingSuggestions } from "./shopping-suggestions.mjs";
 import { visibleWasteWatch } from "./waste-watch.mjs";
 import { quantityKey, visibleOverview } from "./overview.mjs";
+import {
+  CONSUMPTION_ACTIONS,
+  consumptionEventPayload,
+  inventoryAfterConsumption
+} from "./consumption-actions.mjs";
 
 const config = window.__FRIDIVO_CONFIG__ || {};
 const API_BASE_URL = String(config.apiBaseUrl || "").replace(/\/$/, "");
@@ -281,6 +286,9 @@ function priorityItemMarkup(item) {
         <span>${escapeHtml(locationLabel(item.storage_location))}</span>
         ${expiryMeta(item.expiry_date, item.expiry_status, item.days_until_expiry)}
       </div>
+    </div>
+    <div class="priority-actions" aria-label="${escapeHtml(t("consumption.title"))}">
+      ${CONSUMPTION_ACTIONS.map((action) => `<button class="priority-action" type="button" data-priority-consumption="${action.type}" data-priority-item-id="${escapeHtml(item.id)}"><span aria-hidden="true">${action.icon}</span><span>${escapeHtml(t(action.translationKey))}</span></button>`).join("")}
     </div>
   </article>`;
 }
@@ -796,11 +804,11 @@ function renderInventoryEditLocation() {
   elements.inventoryEditLocation.innerHTML = renderSummaryLocationButtons(inventoryEditLocation, "inventory-location");
 }
 
-function openInventorySheet(item, trigger) {
+function openInventorySheet(item, trigger, initialConsumptionType = null) {
   selectedInventoryItem = item;
   inventoryEditQuantity = item.quantity;
   inventoryEditLocation = item.storage_location;
-  pendingConsumptionType = null;
+  pendingConsumptionType = initialConsumptionType;
   consumptionQuantity = 1;
   elements.inventoryEditQuantity.textContent = inventoryEditQuantity;
   renderInventoryEditProduct();
@@ -812,7 +820,7 @@ function openInventorySheet(item, trigger) {
   elements.backdrop.hidden = false;
   elements.inventorySheet.hidden = false;
   document.body.classList.add("sheet-open");
-  setTimeout(() => $("#inventory-quantity-minus").focus(), 50);
+  setTimeout(() => $(initialConsumptionType ? "#confirm-consumption" : "#inventory-quantity-minus").focus(), 50);
 }
 
 function renderInventoryEditProduct() {
@@ -1369,6 +1377,14 @@ elements.inventoryList.addEventListener("click", (event) => {
   const item = inventoryItems.find((candidate) => String(candidate.id) === card.dataset.inventoryId);
   if (item) openInventorySheet(item, card);
 });
+elements.consumeFirstSection.addEventListener("click", (event) => {
+  const action = event.target.closest("[data-priority-consumption]");
+  if (!action) return;
+  const item = consumeFirstItems.find(
+    (candidate) => String(candidate.id) === action.dataset.priorityItemId
+  );
+  if (item) openInventorySheet(item, action, action.dataset.priorityConsumption);
+});
 $$('.add-product-trigger').forEach((button) => button.addEventListener("click", () => showView("search")));
 $$('.nav-item').forEach((button) => button.addEventListener("click", () => showView(button.dataset.view)));
 $("#open-scanner").addEventListener("click", openScanner);
@@ -1671,8 +1687,7 @@ $("#confirm-consumption").addEventListener("click", async () => {
   if (!selectedInventoryItem || !pendingConsumptionType) return;
   const item = selectedInventoryItem;
   const eventType = pendingConsumptionType;
-  const payload = { inventory_item_id: item.id, event_type: eventType };
-  if (eventType !== "FINISHED") payload.quantity = consumptionQuantity;
+  const payload = consumptionEventPayload(item.id, eventType, consumptionQuantity);
   const button = $("#confirm-consumption");
   setMessage(elements.inventoryEditError);
   setLoading(button, true);
@@ -1681,14 +1696,16 @@ $("#confirm-consumption").addEventListener("click", async () => {
       method: "POST",
       body: JSON.stringify(payload)
     });
-    const remaining = item.quantity - consumptionEvent.quantity;
-    inventoryItems = remaining > 0
-      ? inventoryItems.map((candidate) => candidate.id === item.id ? { ...candidate, quantity: remaining } : candidate)
-      : inventoryItems.filter((candidate) => candidate.id !== item.id);
+    inventoryItems = inventoryAfterConsumption(
+      inventoryItems,
+      item.id,
+      consumptionEvent.quantity
+    );
     historyLoaded = false;
     insightsLoaded = false;
     renderInventory(inventoryItems);
     closeInventorySheet();
+    await loadConsumeFirst();
     showToast(t(`success.${eventType.toLowerCase()}`));
   } catch (error) {
     if (error.status !== 401) setMessage(elements.inventoryEditError, userMessage(error, "consumption"));

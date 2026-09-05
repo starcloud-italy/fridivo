@@ -101,6 +101,10 @@ button:disabled { cursor: wait; opacity: .68; }
 .priority-card .product-image { width: 52px; height: 52px; border-radius: 10px; }
 .priority-card .product-name { font-size: 14px; }
 .priority-card .product-meta { margin-top: 6px; }
+.priority-actions { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 6px; min-width: 0; }
+.priority-action { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-width: 0; min-height: 44px; border: 1px solid var(--border); border-radius: 11px; padding: 5px; background: #f9fbf8; color: var(--green-dark); font-size: 11px; font-weight: 750; }
+.priority-action > span:last-child { min-width: 0; overflow-wrap: anywhere; }
+.priority-action:active { background: #e7f0e5; }
 .priority-loading .priority-card { position: relative; }
 .priority-message { min-width: 0; border-radius: 16px; padding: 14px; background: #eef3ec; }
 .priority-message p { margin: 0; }
